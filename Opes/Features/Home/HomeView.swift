@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct HomeView: View {
-    private let accounts = SampleData.accounts
+    @EnvironmentObject private var accountStore: AccountStore
     private let budgets = SampleData.budgets
     private let transactions = SampleData.transactions
 
     private var totalBalance: Decimal {
-        accounts.reduce(0) { $0 + $1.balance }
+        accountStore.accounts.reduce(0) { $0 + $1.balance }
     }
 
     var body: some View {
@@ -19,7 +19,7 @@ struct HomeView: View {
                     Text(totalBalance.currencyText)
                         .font(.system(.largeTitle, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
-                    Text("Across \(accounts.count) accounts")
+                    Text("Across \(accountStore.accounts.count) accounts")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.75))
                 }
@@ -81,4 +81,5 @@ private struct BudgetRow: View {
 
 #Preview {
     NavigationStack { HomeView() }
+        .environmentObject(AccountStore())
 }

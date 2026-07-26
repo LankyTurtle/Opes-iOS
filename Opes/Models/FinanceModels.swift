@@ -13,9 +13,18 @@ struct UserProfile {
 }
 
 struct FinancialAccount: Identifiable {
-    enum Kind {
+    enum Kind: String, CaseIterable, Hashable, Identifiable {
         case everyday
         case savings
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .everyday: "Everyday"
+            case .savings: "Savings"
+            }
+        }
 
         var icon: String {
             switch self {
@@ -25,11 +34,25 @@ struct FinancialAccount: Identifiable {
         }
     }
 
-    let id = UUID()
+    let id: UUID
     let name: String
     let maskedNumber: String
     let balance: Decimal
     let kind: Kind
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        maskedNumber: String,
+        balance: Decimal,
+        kind: Kind
+    ) {
+        self.id = id
+        self.name = name
+        self.maskedNumber = maskedNumber
+        self.balance = balance
+        self.kind = kind
+    }
 }
 
 struct BudgetCategory: Identifiable {

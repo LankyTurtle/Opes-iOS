@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 final class SessionStore: ObservableObject {
-    @Published private(set) var isAuthenticated = false
+    @Published private(set) var isAuthenticated = true
     @Published private(set) var user = UserProfile.sample
 
     func signIn(email: String, password: String) {

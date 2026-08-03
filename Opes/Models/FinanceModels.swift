@@ -35,22 +35,28 @@ struct FinancialAccount: Identifiable {
     }
 
     let id: UUID
-    let name: String
+    let displayName: String
+    let institutionName: String
+    let institutionIcon: String
     let maskedNumber: String
-    let balance: Decimal
+    let availableBalance: Decimal
     let kind: Kind
 
     init(
         id: UUID = UUID(),
-        name: String,
+        displayName: String,
+        institutionName: String,
+        institutionIcon: String,
         maskedNumber: String,
-        balance: Decimal,
+        availableBalance: Decimal,
         kind: Kind
     ) {
         self.id = id
-        self.name = name
+        self.displayName = displayName
+        self.institutionName = institutionName
+        self.institutionIcon = institutionIcon
         self.maskedNumber = maskedNumber
-        self.balance = balance
+        self.availableBalance = availableBalance
         self.kind = kind
     }
 }
@@ -79,8 +85,22 @@ struct Transaction: Identifiable {
 
 enum SampleData {
     static let accounts = [
-        FinancialAccount(name: "Everyday", maskedNumber: "•••• 4821", balance: 3_284.75, kind: .everyday),
-        FinancialAccount(name: "Savings", maskedNumber: "•••• 9014", balance: 12_650.00, kind: .savings)
+        FinancialAccount(
+            displayName: "Everyday",
+            institutionName: "Up Bank",
+            institutionIcon: "building.columns.fill",
+            maskedNumber: "•••• 4821",
+            availableBalance: 3_284.75,
+            kind: .everyday
+        ),
+        FinancialAccount(
+            displayName: "Savings",
+            institutionName: "Commonwealth Bank",
+            institutionIcon: "building.columns.circle.fill",
+            maskedNumber: "•••• 9014",
+            availableBalance: 12_650.00,
+            kind: .savings
+        )
     ]
 
     static let budgets = [

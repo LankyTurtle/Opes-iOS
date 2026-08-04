@@ -52,7 +52,7 @@ struct ProfileView: View {
                 HStack {
                     Label("App version", systemImage: "info.circle")
                     Spacer()
-                    Text("1.0.0")
+                    Text(appVersion)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -65,6 +65,12 @@ struct ProfileView: View {
             }
         }
         .navigationTitle("Profile")
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "—"
     }
 }
 

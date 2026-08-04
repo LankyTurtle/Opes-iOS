@@ -37,6 +37,8 @@ struct HomeView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Home")
         .toolbar {
+            MainPageProfileToolbar()
+
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showingConfiguration = true

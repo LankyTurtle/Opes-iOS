@@ -82,6 +82,8 @@ struct AccountsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Accounts")
         .toolbar {
+            MainPageProfileToolbar()
+
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Menu {
                     Picker("Sort accounts", selection: $sortOptionRawValue) {

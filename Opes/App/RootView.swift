@@ -21,23 +21,26 @@ private struct MainTabView: View {
     @State private var selectedTab = AppTab.home
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                HomeView()
+        Group {
+            switch selectedTab {
+            case .home:
+                NavigationStack {
+                    HomeView()
+                }
+            case .accounts:
+                NavigationStack {
+                    AccountsView()
+                }
+            case .transactions:
+                NavigationStack {
+                    TransactionsView()
+                }
+            case .budgets:
+                NavigationStack {
+                    BudgetsView()
+                }
             }
-            .tag(AppTab.home)
-
-            NavigationStack {
-                AccountsView()
-            }
-            .tag(AppTab.accounts)
-
-            NavigationStack {
-                ProfileView()
-            }
-            .tag(AppTab.profile)
         }
-        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             LiquidGlassTabBar(selection: $selectedTab)
         }
@@ -48,7 +51,8 @@ private struct MainTabView: View {
 private enum AppTab: String, CaseIterable, Hashable, Identifiable {
     case home
     case accounts
-    case profile
+    case transactions
+    case budgets
 
     var id: Self { self }
 
@@ -56,7 +60,8 @@ private enum AppTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "Home"
         case .accounts: "Accounts"
-        case .profile: "Profile"
+        case .transactions: "Transactions"
+        case .budgets: "Budgets"
         }
     }
 
@@ -64,7 +69,8 @@ private enum AppTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .home: "house.fill"
         case .accounts: "creditcard.fill"
-        case .profile: "person.crop.circle.fill"
+        case .transactions: "arrow.left.arrow.right"
+        case .budgets: "chart.pie.fill"
         }
     }
 }

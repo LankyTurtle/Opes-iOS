@@ -29,6 +29,19 @@ struct SectionHeader: View {
     }
 }
 
+struct MainPageProfileToolbar: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            NavigationLink {
+                ProfileView()
+            } label: {
+                Label("Profile", systemImage: "person.crop.circle.fill")
+            }
+            .accessibilityHint("View your profile and settings")
+        }
+    }
+}
+
 struct TransactionRow: View {
     let transaction: Transaction
 

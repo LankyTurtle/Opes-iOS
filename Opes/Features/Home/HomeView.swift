@@ -36,9 +36,8 @@ struct HomeView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Home")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            MainPageProfileToolbar()
-
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showingConfiguration = true
@@ -49,8 +48,11 @@ struct HomeView: View {
                 if !dashboardStore.visibleTiles.isEmpty {
                     EditButton()
                 }
+
+                ProfileNavigationButton()
             }
         }
+        .scrollHidingNavigationHeader()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()
         }

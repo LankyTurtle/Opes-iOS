@@ -29,16 +29,41 @@ struct SectionHeader: View {
     }
 }
 
-struct MainPageProfileToolbar: ToolbarContent {
-    var body: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            NavigationLink {
-                ProfileView()
-            } label: {
-                Label("Profile", systemImage: "person.crop.circle.fill")
-            }
-            .accessibilityHint("View your profile and settings")
+struct ProfileNavigationButton: View {
+    var body: some View {
+        NavigationLink {
+            ProfileView()
+        } label: {
+            Label("Profile", systemImage: "person.crop.circle.fill")
         }
+        .accessibilityHint("View your profile and settings")
+    }
+}
+
+private struct ScrollHidingNavigationHeader: ViewModifier {
+    @State private var isHeaderHidden = false
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(isHeaderHidden ? .hidden : .visible, for: .navigationBar)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y
+            } action: { oldOffset, newOffset in
+                guard abs(newOffset - oldOffset) > 8 else { return }
+
+                if newOffset <= 0 {
+                    isHeaderHidden = false
+                } else {
+                    isHeaderHidden = newOffset > oldOffset
+                }
+            }
+    }
+}
+
+extension View {
+    /// Hides the navigation header while scrolling down and reveals it while scrolling up.
+    func scrollHidingNavigationHeader() -> some View {
+        modifier(ScrollHidingNavigationHeader())
     }
 }
 

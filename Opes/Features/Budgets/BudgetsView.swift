@@ -45,9 +45,13 @@ struct BudgetsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Budgets")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            MainPageProfileToolbar()
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileNavigationButton()
+            }
         }
+        .scrollHidingNavigationHeader()
     }
 
     private func decimalDouble(_ value: Decimal) -> Double {

@@ -70,9 +70,8 @@ struct AccountsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Accounts")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            MainPageProfileToolbar()
-
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Menu {
                     Picker("Sort accounts", selection: $sortOptionRawValue) {
@@ -90,8 +89,11 @@ struct AccountsView: View {
                 } label: {
                     Label("Add account", systemImage: "plus")
                 }
+
+                ProfileNavigationButton()
             }
         }
+        .scrollHidingNavigationHeader()
         .sheet(item: $editorContext) { context in
             AccountEditorView(account: context.account) { account in
                 if context.account == nil {

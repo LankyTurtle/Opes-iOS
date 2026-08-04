@@ -7,9 +7,11 @@ struct SecurityView: View {
 
     var body: some View {
         Form {
-            Section("Sign in") {
+            Section {
                 Toggle("Face ID", isOn: $biometricUnlock)
                 Toggle("Two-factor authentication", isOn: $twoFactorAuthentication)
+            } header: {
+                Text("Sign in")
             } footer: {
                 Text("Two-factor authentication adds an extra verification step when you sign in on a new device.")
             }

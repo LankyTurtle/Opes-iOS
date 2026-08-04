@@ -22,17 +22,21 @@ struct AboutView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("App") {
+            Section {
                 LabeledContent("Version", value: appVersion)
                 LabeledContent(
                     "Build",
                     value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
                 )
+            } header: {
+                Text("App")
             }
 
-            Section("Privacy") {
+            Section {
                 Text("Opes uses local sample data in this prototype. No financial information is sent from the app.")
                     .foregroundStyle(.secondary)
+            } header: {
+                Text("Privacy")
             }
         }
         .navigationTitle("About Opes")

@@ -26,7 +26,7 @@ struct PersonalDetailsView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("Your details") {
+            Section {
                 TextField("Full name", text: $name)
                     .textContentType(.name)
                 TextField("Email address", text: $email)
@@ -34,6 +34,8 @@ struct PersonalDetailsView: View {
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+            } header: {
+                Text("Your details")
             }
 
             Section {

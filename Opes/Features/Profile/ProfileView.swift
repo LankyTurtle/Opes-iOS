@@ -17,7 +17,7 @@ struct ProfileView: View {
                 Text("Manage the details connected to your Opes account.")
             }
 
-            Section("Account") {
+            Section {
                 NavigationLink {
                     PersonalDetailsView()
                 } label: {
@@ -35,9 +35,11 @@ struct ProfileView: View {
                 } label: {
                     Label("Security", systemImage: "lock.shield")
                 }
+            } header: {
+                Text("Account")
             }
 
-            Section("Support") {
+            Section {
                 NavigationLink {
                     HelpAndSupportView()
                 } label: {
@@ -48,6 +50,8 @@ struct ProfileView: View {
                 } label: {
                     Label("About Opes", systemImage: "info.circle")
                 }
+            } header: {
+                Text("Support")
             }
 
             Section {

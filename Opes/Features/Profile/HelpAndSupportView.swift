@@ -5,10 +5,12 @@ struct HelpAndSupportView: View {
 
     var body: some View {
         List {
-            Section("Popular help") {
+            Section {
                 HelpTopicRow(title: "Getting started", detail: "Set up your accounts and dashboard.", icon: "play.circle")
                 HelpTopicRow(title: "Managing budgets", detail: "Keep your monthly spending on track.", icon: "chart.pie")
                 HelpTopicRow(title: "Keeping your account secure", detail: "Protect your financial information.", icon: "lock.shield")
+            } header: {
+                Text("Popular help")
             }
 
             Section {

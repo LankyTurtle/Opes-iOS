@@ -8,9 +8,11 @@ struct ContactSupportView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("How can we help?") {
+                Section {
                     TextEditor(text: $message)
                         .frame(minHeight: 140)
+                } header: {
+                    Text("How can we help?")
                 }
                 if didSend {
                     Section {

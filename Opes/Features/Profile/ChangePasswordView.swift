@@ -14,12 +14,14 @@ struct ChangePasswordView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Password") {
+                Section {
                     SecureField("Current password", text: $currentPassword)
                     SecureField("New password", text: $newPassword)
                         .textContentType(.newPassword)
                     SecureField("Confirm new password", text: $confirmation)
                         .textContentType(.newPassword)
+                } header: {
+                    Text("Password")
                 }
                 if didUpdatePassword {
                     Section {

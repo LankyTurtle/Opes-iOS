@@ -267,7 +267,7 @@ private struct AccountEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Account details") {
+                Section {
                     TextField("Display name", text: $displayName)
                         .textInputAutocapitalization(.words)
 
@@ -296,6 +296,8 @@ private struct AccountEditorView: View {
 
                     TextField("Available balance", text: $availableBalance)
                         .keyboardType(.decimalPad)
+                } header: {
+                    Text("Account details")
                 }
 
                 Section {

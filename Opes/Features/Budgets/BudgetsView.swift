@@ -35,10 +35,12 @@ struct BudgetsView: View {
                 .padding(.vertical, 8)
             }
 
-            Section("Categories") {
+            Section {
                 ForEach(budgets) { budget in
                     BudgetCategoryRow(budget: budget)
                 }
+            } header: {
+                Text("Categories")
             }
         }
         .listStyle(.insetGrouped)

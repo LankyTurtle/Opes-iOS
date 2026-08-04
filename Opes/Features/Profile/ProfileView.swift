@@ -2,42 +2,36 @@ import SwiftUI
 
 struct ProfileView: View {
     @EnvironmentObject private var session: SessionStore
-    @State private var notificationsEnabled = true
+    @State private var showingSignOutConfirmation = false
 
     var body: some View {
         List {
             Section {
-                HStack(spacing: 16) {
-                    Text(session.user.initials)
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(Color.opesPrimary, in: Circle())
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(session.user.name)
-                            .font(.headline)
-                        Text(session.user.email)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                NavigationLink {
+                    PersonalDetailsView()
+                } label: {
+                    ProfileHeader(user: session.user)
                 }
                 .padding(.vertical, 8)
+            } footer: {
+                Text("Manage the details connected to your Opes account.")
             }
 
-            Section("Preferences") {
+            Section("Account") {
                 NavigationLink {
-                    PlaceholderDetailView(title: "Personal details")
+                    PersonalDetailsView()
                 } label: {
                     Label("Personal details", systemImage: "person.text.rectangle")
                 }
 
-                Toggle(isOn: $notificationsEnabled) {
-                    Label("Notifications", systemImage: "bell")
+                NavigationLink {
+                    NotificationsView()
+                } label: {
+                    Label("Notifications", systemImage: "bell.badge")
                 }
 
                 NavigationLink {
-                    PlaceholderDetailView(title: "Security")
+                    SecurityView()
                 } label: {
                     Label("Security", systemImage: "lock.shield")
                 }
@@ -45,46 +39,32 @@ struct ProfileView: View {
 
             Section("Support") {
                 NavigationLink {
-                    PlaceholderDetailView(title: "Help and support")
+                    HelpAndSupportView()
                 } label: {
                     Label("Help and support", systemImage: "questionmark.circle")
                 }
-                HStack {
-                    Label("App version", systemImage: "info.circle")
-                    Spacer()
-                    Text(appVersion)
-                        .foregroundStyle(.secondary)
+                NavigationLink {
+                    AboutView()
+                } label: {
+                    Label("About Opes", systemImage: "info.circle")
                 }
             }
 
             Section {
                 Button("Sign out", role: .destructive) {
-                    session.signOut()
+                    showingSignOutConfirmation = true
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .navigationTitle("Profile")
-    }
-
-    private var appVersion: String {
-        Bundle.main.object(
-            forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "—"
-    }
-}
-
-private struct PlaceholderDetailView: View {
-    let title: String
-
-    var body: some View {
-        ContentUnavailableView(
-            title,
-            systemImage: "hammer",
-            description: Text("This section is ready for a future iteration.")
-        )
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog("Sign out of Opes?", isPresented: $showingSignOutConfirmation) {
+            Button("Sign out", role: .destructive) {
+                session.signOut()
+            }
+        } message: {
+            Text("You can sign back in at any time.")
+        }
     }
 }
 

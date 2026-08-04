@@ -19,7 +19,7 @@ enum PrimaryTab: Hashable {
     var icon: String {
         switch self {
         case .home: "house.fill"
-        case .accounts: "creditcard.fill"
+        case .accounts: "wallet.bifold.fill"
         case .transactions: "arrow.left.arrow.right"
         case .budgets: "chart.pie.fill"
         }

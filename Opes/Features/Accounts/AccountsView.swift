@@ -4,7 +4,6 @@ struct AccountsView: View {
     @EnvironmentObject private var accountStore: AccountStore
     @AppStorage("accounts.sortOption") private var sortOptionRawValue =
         AccountSortOption.displayName.rawValue
-    @State private var showingPayment = false
     @State private var editorContext: AccountEditorContext?
     @State private var accountPendingRemoval: FinancialAccount?
     @State private var showingRemovalConfirmation = false
@@ -65,16 +64,6 @@ struct AccountsView: View {
                     Text("Sorted by \(sortOption.title.lowercased()).")
                 }
 
-                Section {
-                    Button {
-                        showingPayment = true
-                    } label: {
-                        Label("Make a payment", systemImage: "arrow.up.right")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .tint(.opesPrimary)
-                }
             }
         }
         .listStyle(.plain)
@@ -102,9 +91,6 @@ struct AccountsView: View {
                     Label("Add account", systemImage: "plus")
                 }
             }
-        }
-        .sheet(isPresented: $showingPayment) {
-            PaymentView()
         }
         .sheet(item: $editorContext) { context in
             AccountEditorView(account: context.account) { account in
@@ -352,40 +338,6 @@ private struct InstitutionIconOption: Identifiable {
     let icon: String
 
     var id: String { icon }
-}
-
-private struct PaymentView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var recipient = ""
-    @State private var amount = ""
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Payment details") {
-                    TextField("Recipient", text: $recipient)
-                    TextField("Amount", text: $amount)
-                        .keyboardType(.decimalPad)
-                }
-                Section {
-                    Text("Payments are not submitted in this prototype.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("New payment")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Review") { dismiss() }
-                        .disabled(recipient.isEmpty || amount.isEmpty)
-                }
-            }
-        }
-    }
 }
 
 #Preview {

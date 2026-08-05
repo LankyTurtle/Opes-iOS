@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: SessionStore
     @State private var showingSignOutConfirmation = false
 
@@ -62,6 +63,11 @@ struct ProfileView: View {
             }
         }
         .navigationTitle("Profile")
+        .toolbar {
+            Button(role: .close) {
+                dismiss()
+            }
+        }
         .confirmationDialog("Sign out of Opes?", isPresented: $showingSignOutConfirmation) {
             Button("Sign out", role: .destructive) {
                 session.signOut()

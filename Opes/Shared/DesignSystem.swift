@@ -29,20 +29,19 @@ struct SectionHeader: View {
     }
 }
 
-enum AppTransition {
-    static let profile = "profile"
-}
-
 struct ProfileToolbarContainer<Content: View>: View {
+    let tab: PrimaryTab
     @Binding private var isProfilePresented: Bool
     private let profileTransition: Namespace.ID
     private let content: () -> Content
 
     init(
+        tab: PrimaryTab,
         isProfilePresented: Binding<Bool>,
         profileTransition: Namespace.ID,
         @ViewBuilder content: @escaping () -> Content
     ) {
+        self.tab = tab
         _isProfilePresented = isProfilePresented
         self.profileTransition = profileTransition
         self.content = content
@@ -63,21 +62,9 @@ struct ProfileToolbarContainer<Content: View>: View {
                     .accessibilityHint("View your profile and settings")
                 }
                 .matchedTransitionSource(
-                    id: AppTransition.profile,
+                    id: tab,
                     in: profileTransition
                 )
-            }
-            .sheet(isPresented: $isProfilePresented) {
-                NavigationStack {
-                    ProfileView()
-                }
-                .navigationTransition(
-                    .zoom(
-                        sourceID: AppTransition.profile,
-                        in: profileTransition
-                    )
-                )
-                .presentationDetents([.large])
             }
     }
 }

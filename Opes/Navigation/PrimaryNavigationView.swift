@@ -14,6 +14,18 @@ struct PrimaryNavigationView: View {
             profileTab(.budgets) { BudgetsView() }
         }
         .tint(.opesPrimary)
+        .sheet(isPresented: $isProfilePresented) {
+            NavigationStack {
+                ProfileView()
+            }
+            .navigationTransition(
+                .zoom(
+                    sourceID: selectedTab,
+                    in: profileTransition
+                )
+            )
+            .presentationDetents([.large])
+        }
     }
 
     private func profileTab<Content: View>(
@@ -22,6 +34,7 @@ struct PrimaryNavigationView: View {
     ) -> some TabContent<PrimaryTab> {
         createTabNavigationStack(title: tab.title, image: tab.icon, tag: tab) {
             ProfileToolbarContainer(
+                tab: tab,
                 isProfilePresented: $isProfilePresented,
                 profileTransition: profileTransition,
                 content: content

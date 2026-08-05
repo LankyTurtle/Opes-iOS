@@ -19,7 +19,8 @@ struct TransactionsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .rootNavigationHeader("Transactions")
+        .navigationTitle("Transactions")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
         }
         .scrollHidingNavigationHeader()

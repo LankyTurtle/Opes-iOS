@@ -8,45 +8,10 @@ struct PrimaryNavigationView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            createTabNavigationStack(title: PrimaryTab.home.title, image: PrimaryTab.home.icon, tag: PrimaryTab.home)
-                {
-                    ProfileToolbarContainer(
-                        isProfilePresented: $isProfilePresented,
-                        profileTransition: profileTransition
-                    ) {
-                        HomeView()
-                    }
-                }
-
-            createTabNavigationStack( title: PrimaryTab.accounts.title, image: PrimaryTab.accounts.icon, tag: PrimaryTab.accounts)
-                {
-                    ProfileToolbarContainer(
-                        isProfilePresented: $isProfilePresented,
-                        profileTransition: profileTransition
-                    ) {
-                        AccountsView()
-                    }
-                }
-
-            createTabNavigationStack(title: PrimaryTab.transactions.title, image: PrimaryTab.transactions.icon, tag: PrimaryTab.transactions)
-                {
-                    ProfileToolbarContainer(
-                        isProfilePresented: $isProfilePresented,
-                        profileTransition: profileTransition
-                    ) {
-                        TransactionsView()
-                    }
-                }
-
-            createTabNavigationStack(title: PrimaryTab.budgets.title, image: PrimaryTab.budgets.icon, tag: PrimaryTab.budgets)
-                {
-                    ProfileToolbarContainer(
-                        isProfilePresented: $isProfilePresented,
-                        profileTransition: profileTransition
-                    ) {
-                        BudgetsView()
-                    }
-                }
+            profileTab(.home) { HomeView() }
+            profileTab(.accounts) { AccountsView() }
+            profileTab(.transactions) { TransactionsView() }
+            profileTab(.budgets) { BudgetsView() }
         }
         .tint(.opesPrimary)
         .sheet(isPresented: $isProfilePresented) {
@@ -60,6 +25,19 @@ struct PrimaryNavigationView: View {
                     )
             }
             .presentationDetents([.large])
+        }
+    }
+
+    private func profileTab<Content: View>(
+        _ tab: PrimaryTab,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some TabContent<PrimaryTab> {
+        createTabNavigationStack(title: tab.title, image: tab.icon, tag: tab) {
+            ProfileToolbarContainer(
+                isProfilePresented: $isProfilePresented,
+                profileTransition: profileTransition,
+                content: content
+            )
         }
     }
 }

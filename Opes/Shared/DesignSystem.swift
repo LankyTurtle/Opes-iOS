@@ -61,23 +61,23 @@ struct ProfileToolbarContainer<Content: View>: View {
                         )
                     }
                     .accessibilityHint("View your profile and settings")
-                    .matchedTransitionSource(
-                        id: AppTransition.profile,
+                }
+                .matchedTransitionSource(
+                    id: AppTransition.profile,
+                    in: profileTransition
+                )
+            }
+            .sheet(isPresented: $isProfilePresented) {
+                NavigationStack {
+                    ProfileView()
+                }
+                .navigationTransition(
+                    .zoom(
+                        sourceID: AppTransition.profile,
                         in: profileTransition
                     )
-                    .sheet(isPresented: $isProfilePresented) {
-                        NavigationStack {
-                            ProfileView()
-                        }
-                        .navigationTransition(
-                            .zoom(
-                                sourceID: AppTransition.profile,
-                                in: profileTransition
-                            )
-                        )
-                        .presentationDetents([.large])
-                    }
-                }
+                )
+                .presentationDetents([.large])
             }
     }
 }

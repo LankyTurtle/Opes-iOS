@@ -32,13 +32,16 @@ struct PrimaryNavigationView: View {
         _ tab: PrimaryTab,
         @ViewBuilder content: @escaping () -> Content
     ) -> some TabContent<PrimaryTab> {
-        createTabNavigationStack(title: tab.title, image: tab.icon, tag: tab) {
-            ProfileToolbarContainer(
-                tab: tab,
-                isProfilePresented: $isProfilePresented,
-                profileTransition: profileTransition,
-                content: content
-            )
+        createTabNavigationStack(
+            title: tab.title,
+            image: tab.icon,
+            tag: tab,
+            content: content
+        ) {
+            ToolbarItem(placement: .topBarTrailing) {
+                ProfileToolbarButton(isProfilePresented: $isProfilePresented)
+                .matchedTransitionSource(id: tab, in: profileTransition)
+            }
         }
     }
 }

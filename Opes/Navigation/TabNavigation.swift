@@ -8,12 +8,22 @@ import SwiftUI
 ///   - tag: The value that identifies this tab in its parent `TabView` selection.
 ///   - content: The root view displayed when the tab is selected.
 /// - Returns: A tab that can be placed inside a `TabView`.
-func createTabNavigationStack<Content: View, Tag: Hashable>(
+func createTabNavigationStack<
+    Content: View,
+    TrailingToolbarContent: ToolbarContent,
+    Tag: Hashable
+>(
     title: String,
     image: String,
     tag: Tag,
-    @ViewBuilder content: @escaping () -> Content
+    @ViewBuilder content: @escaping () -> Content,
+    @ToolbarContentBuilder trailingToolbarContent: @escaping () -> TrailingToolbarContent
 ) -> some TabContent<Tag> {
     Tab(title, systemImage: image, value: tag)
-        { NavigationStack { content() } }
+        {
+            NavigationStack {
+                content()
+            }
+            .toolbar(content: trailingToolbarContent)
+        }
 }

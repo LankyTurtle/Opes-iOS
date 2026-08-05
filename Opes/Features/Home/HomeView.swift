@@ -35,8 +35,7 @@ struct HomeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Home")
-        .navigationBarTitleDisplayMode(.inlineLarge)
+        .pageTitle("Home")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {

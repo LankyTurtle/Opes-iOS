@@ -69,8 +69,7 @@ struct AccountsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Accounts")
-        .navigationBarTitleDisplayMode(.inlineLarge)
+        .pageTitle("Accounts")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Menu {

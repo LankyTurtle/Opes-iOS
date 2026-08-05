@@ -176,7 +176,7 @@ jobs:
                   raise ValueError("Unexpected ECDSA signature integer")
               length = der_signature[offset + 1]
               offset += 2
-              values.append(der_signature[offset:offset + length].lstrip(b"\\0").rjust(32, b"\\0"))
+              values.append(der_signature[offset:offset + length].lstrip(b"\0").rjust(32, b"\0"))
               offset += length
 
           print((signing_input + b"." + encode(b"".join(values))).decode())

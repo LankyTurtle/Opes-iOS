@@ -29,6 +29,44 @@ struct SectionHeader: View {
     }
 }
 
+enum AppTransition {
+    static let profile = "profile"
+}
+
+struct ProfileToolbarContainer<Content: View>: View {
+    @Binding private var isProfilePresented: Bool
+    private let profileTransition: Namespace.ID
+    private let content: () -> Content
+
+    init(
+        isProfilePresented: Binding<Bool>,
+        profileTransition: Namespace.ID,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        _isProfilePresented = isProfilePresented
+        self.profileTransition = profileTransition
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        isProfilePresented = true
+                    } label: {
+                        Label("Profile", systemImage: "person.crop.circle.fill")
+                    }
+                    .accessibilityHint("View your profile and settings")
+                    .matchedTransitionSource(
+                        id: AppTransition.profile,
+                        in: profileTransition
+                    )
+                }
+            }
+    }
+}
+
 private struct ScrollHidingNavigationHeader: ViewModifier {
     @State private var isHeaderHidden = false
 

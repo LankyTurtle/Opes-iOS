@@ -59,9 +59,13 @@ extension View {
     func rootNavigationHeader(_ title: String) -> some View {
         toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Text(title)
-                    .font(.largeTitle.bold())
-                    .accessibilityAddTraits(.isHeader)
+                Button(action: {}) {
+                    Text(title)
+                        .font(.largeTitle.bold())
+                }
+                .buttonStyle(.plain)
+                .allowsHitTesting(false)
+                .accessibilityAddTraits(.isHeader)
             }
         }
     }

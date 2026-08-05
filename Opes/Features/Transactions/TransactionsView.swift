@@ -23,7 +23,7 @@ struct TransactionsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ProfileNavigationButton()
+                ProfilePresentationButton()
             }
         }
         .scrollHidingNavigationHeader()

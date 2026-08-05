@@ -50,7 +50,7 @@ struct BudgetsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ProfileNavigationButton()
+                ProfilePresentationButton()
             }
         }
         .scrollHidingNavigationHeader()

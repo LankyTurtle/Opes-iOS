@@ -29,14 +29,31 @@ struct SectionHeader: View {
     }
 }
 
-struct ProfileNavigationButton: View {
+enum AppTransition {
+    static let profile = "profile"
+}
+
+struct ProfilePresentationButton: View {
+    @Namespace private var profileTransition
+    @State private var isProfilePresented = false
+
     var body: some View {
-        NavigationLink {
-            ProfileView()
+        Button {
+            isProfilePresented = true
         } label: {
             Label("Profile", systemImage: "person.crop.circle.fill")
         }
         .accessibilityHint("View your profile and settings")
+        .matchedTransitionSource(id: AppTransition.profile, in: profileTransition)
+        .sheet(isPresented: $isProfilePresented) {
+            NavigationStack {
+                ProfileView()
+                    .navigationTransition(
+                        .zoom(sourceID: AppTransition.profile, in: profileTransition)
+                    )
+            }
+            .presentationDetents([.large])
+        }
     }
 }
 

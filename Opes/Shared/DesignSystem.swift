@@ -54,6 +54,17 @@ extension View {
     func scrollHidingNavigationHeader() -> some View {
         modifier(ScrollHidingNavigationHeader())
     }
+
+    /// Adds an App Store-style title aligned with the navigation bar's toolbar actions.
+    func rootNavigationHeader(_ title: String) -> some View {
+        toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Text(title)
+                    .font(.largeTitle.bold())
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+    }
 }
 
 struct TransactionRow: View {

@@ -49,7 +49,6 @@ struct HomeView: View {
                     EditButton()
                 }
 
-                ProfilePresentationButton()
             }
         }
         .scrollHidingNavigationHeader()

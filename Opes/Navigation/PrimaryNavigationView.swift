@@ -1,8 +1,14 @@
 import SwiftUI
 
+private enum AppTransition {
+    static let profile = "profile"
+}
+
 /// Coordinates the app's primary tab navigation and presents each feature's root view.
 struct PrimaryNavigationView: View {
     @State private var selectedTab = PrimaryTab.home
+    @State private var isProfilePresented = false
+    @Namespace private var profileTransition
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -19,5 +25,31 @@ struct PrimaryNavigationView: View {
                 { BudgetsView() }
         }
         .tint(.opesPrimary)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isProfilePresented = true
+                } label: {
+                    Label("Profile", systemImage: "person.crop.circle.fill")
+                }
+                .accessibilityHint("View your profile and settings")
+                .matchedTransitionSource(
+                    id: AppTransition.profile,
+                    in: profileTransition
+                )
+            }
+        }
+        .sheet(isPresented: $isProfilePresented) {
+            NavigationStack {
+                ProfileView()
+                    .navigationTransition(
+                        .zoom(
+                            sourceID: AppTransition.profile,
+                            in: profileTransition
+                        )
+                    )
+            }
+            .presentationDetents([.large])
+        }
     }
 }

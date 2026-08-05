@@ -90,7 +90,6 @@ struct AccountsView: View {
                     Label("Add account", systemImage: "plus")
                 }
 
-                ProfilePresentationButton()
             }
         }
         .scrollHidingNavigationHeader()

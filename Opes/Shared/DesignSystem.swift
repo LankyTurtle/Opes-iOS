@@ -55,13 +55,28 @@ struct ProfileToolbarContainer<Content: View>: View {
                     Button {
                         isProfilePresented = true
                     } label: {
-                        Label("Profile", systemImage: "person.crop.circle.fill")
+                        Label(
+                            "Profile",
+                            systemImage: "person.crop.circle.fill"
+                        )
                     }
                     .accessibilityHint("View your profile and settings")
                     .matchedTransitionSource(
                         id: AppTransition.profile,
                         in: profileTransition
                     )
+                    .sheet(isPresented: $isProfilePresented) {
+                        NavigationStack {
+                            ProfileView()
+                        }
+                        .navigationTransition(
+                            .zoom(
+                                sourceID: AppTransition.profile,
+                                in: profileTransition
+                            )
+                        )
+                        .presentationDetents([.large])
+                    }
                 }
             }
     }

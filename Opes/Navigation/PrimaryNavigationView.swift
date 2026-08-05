@@ -14,18 +14,6 @@ struct PrimaryNavigationView: View {
             profileTab(.budgets) { BudgetsView() }
         }
         .tint(.opesPrimary)
-        .sheet(isPresented: $isProfilePresented) {
-            NavigationStack {
-                ProfileView()
-                    .navigationTransition(
-                        .zoom(
-                            sourceID: AppTransition.profile,
-                            in: profileTransition
-                        )
-                    )
-            }
-            .presentationDetents([.large])
-        }
     }
 
     private func profileTab<Content: View>(

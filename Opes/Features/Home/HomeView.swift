@@ -4,7 +4,7 @@ struct HomeView: View {
     @EnvironmentObject private var dashboardStore: DashboardStore
     @State private var showingConfiguration = false
     @Binding var isProfilePresented: Bool
-    
+
     var body: some View {
         List {
             if dashboardStore.visibleTiles.isEmpty {
@@ -49,9 +49,8 @@ struct HomeView: View {
                     EditButton()
                 }
             }
-
-            .addProfileButtonToToolbar(isProfilePresented: $isProfilePresented, placement: .topBarPinnedTrailing, preButtonSpacer: .fixed)
         }
+        .addProfileButtonToToolbar(isProfilePresented: $isProfilePresented, placement: .topBarPinnedTrailing, preButtonSpacer: .fixed)
         .scrollHidingNavigationHeader()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()

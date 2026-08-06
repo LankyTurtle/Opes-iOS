@@ -50,7 +50,7 @@ struct HomeView: View {
                 }
             }
         }
-        .scrollHidingNavigationHeader()
+        .scrollHideNavigationBar()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()
         }

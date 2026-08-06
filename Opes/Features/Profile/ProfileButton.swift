@@ -63,4 +63,28 @@ extension View {
             }
         }
     }
+
+    func profileToolbar<Content: ToolbarContent>(
+        isProfilePresented: Binding<Bool>,
+        placement: ToolbarItemPlacement = .topBarTrailing,
+        preButtonSpacer: SpacerSizing? = nil,
+        postButtonSpacer: SpacerSizing? = nil,
+        @ToolbarContentBuilder content: () -> Content
+    ) -> some View {
+        self.toolbar {
+            content()
+
+            if let preButtonSpacer {
+                ToolbarSpacer(preButtonSpacer, placement: placement)
+            }
+
+            ToolbarItem(placement: placement) {
+                ProfileButton(isProfilePresented: isProfilePresented)
+            }
+
+            if let postButtonSpacer {
+                ToolbarSpacer(postButtonSpacer, placement: placement)
+            }
+        }
+    }
 }

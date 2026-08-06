@@ -37,11 +37,12 @@ struct HomeView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .pageTitle("Home", displayMode: .inlineLarge)
-        .toolbar {
+        .profileToolbar(isProfilePresented: $isProfilePresented, placement: .topBarTrailing, preButtonSpacer: .fixed) {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showingConfiguration = true
-                } label: {
+                }
+                label: {
                     Label("Configure tiles", systemImage: "slider.horizontal.3")
                 }
 
@@ -50,11 +51,6 @@ struct HomeView: View {
                 }
             }
         }
-        .addProfileButtonToToolbar(
-            isProfilePresented: $isProfilePresented,
-            placement: .topBarTrailing,
-            preButtonSpacer: .fixed
-        )
         .scrollHidingNavigationHeader()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()

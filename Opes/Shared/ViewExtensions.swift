@@ -6,7 +6,7 @@ extension View {
     /// - Parameters:
     ///   - title: The title to display in the navigation bar.
     /// - Returns: A view with the specified navigation title.
-    func pageTitle(_ title: String) -> some View {
+    func setViewTitle(_ title: String) -> some View {
         self
             .navigationTitle(title)
     }
@@ -16,7 +16,7 @@ extension View {
     ///   - title: The title to display in the navigation bar.
     ///   - displayMode: The display mode for the navigation bar title.
     /// - Returns: A view configured with the specified navigation title and display mode.
-    func pageTitle(_ title: String, displayMode: ToolbarTitleDisplayMode) -> some View {
+    func setViewTitle(_ title: String, displayMode: ToolbarTitleDisplayMode) -> some View {
         self
             .navigationTitle(title)
             .toolbarTitleDisplayMode(displayMode)

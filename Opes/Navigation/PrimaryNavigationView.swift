@@ -8,7 +8,8 @@ struct PrimaryNavigationView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            profileTab(.home) { HomeView() }
+            HomeView(isProfilePresented: $isProfilePresented)
+            
             profileTab(.accounts) { AccountsView() }
             profileTab(.transactions) { TransactionsView() }
             profileTab(.budgets) { BudgetsView() }
@@ -36,7 +37,7 @@ struct PrimaryNavigationView: View {
             content()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        ProfileToolbarButton(isProfilePresented: $isProfilePresented)
+                        ProfileButton(isProfilePresented: $isProfilePresented)
                             .matchedTransitionSource(id: tab, in: profileTransition)
                     }
                 }

@@ -50,7 +50,11 @@ struct HomeView: View {
                 }
             }
         }
-        .addProfileButtonToToolbar(isProfilePresented: $isProfilePresented)
+        .addProfileButtonToToolbar(
+            isProfilePresented: $isProfilePresented,
+            placement: .topBarTrailing,
+            preButtonSpacer: .fixed
+        )
         .scrollHidingNavigationHeader()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()

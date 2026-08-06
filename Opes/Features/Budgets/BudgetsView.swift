@@ -49,7 +49,7 @@ struct BudgetsView: View {
         .pageTitle("Budgets", displayMode: .inlineLarge)
         .toolbar {
         }
-        .scrollHidingNavigationHeader()
+        .scrollHideNavigationBar()
     }
 
     private func decimalDouble(_ value: Decimal) -> Double {

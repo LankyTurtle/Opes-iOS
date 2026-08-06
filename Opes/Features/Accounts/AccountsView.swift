@@ -91,7 +91,7 @@ struct AccountsView: View {
 
             }
         }
-        .scrollHidingNavigationHeader()
+        .scrollHideNavigationBar()
         .sheet(item: $editorContext) { context in
             AccountEditorView(account: context.account) { account in
                 if context.account == nil {

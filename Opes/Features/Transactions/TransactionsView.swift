@@ -22,7 +22,7 @@ struct TransactionsView: View {
         .pageTitle("Transactions", displayMode: .inlineLarge)
         .toolbar {
         }
-        .scrollHidingNavigationHeader()
+        .scrollHideNavigationBar()
     }
 }
 

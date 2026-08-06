@@ -2,9 +2,9 @@ import SwiftUI
 
 private struct ScrollHideNavigationBarViewModifier: ViewModifier {
     @State private var isHeaderHidden = false
-    @State private var previousOffset: CGFloat = 0
+    @State private var previousTranslation: CGFloat = 0
 
-    private let scrollThreshold: CGFloat = 8
+    private let directionThreshold: CGFloat = 4
 
     func body(content: Content) -> some View {
         content
@@ -12,24 +12,32 @@ private struct ScrollHideNavigationBarViewModifier: ViewModifier {
                 isHeaderHidden ? .hidden : .visible,
                 for: .navigationBar
             )
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.y + geometry.contentInsets.top
-            } action: { _, newOffset in
-                if newOffset <= 0 {
-                    isHeaderHidden = false
-                    previousOffset = 0
-                    return
-                }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        let currentTranslation = value.translation.height
+                        let delta = currentTranslation - previousTranslation
 
-                let difference = newOffset - previousOffset
+                        guard abs(delta) >= directionThreshold else {
+                            return
+                        }
 
-                guard abs(difference) >= scrollThreshold else {
-                    return
-                }
+                        if delta < 0 {
+                            // Finger moving up:
+                            // content is scrolling down.
+                            isHeaderHidden = true
+                        } else {
+                            // Finger moving down:
+                            // content is scrolling up.
+                            isHeaderHidden = false
+                        }
 
-                isHeaderHidden = difference > 0
-                previousOffset = newOffset
-            }
+                        previousTranslation = currentTranslation
+                    }
+                    .onEnded { _ in
+                        previousTranslation = 0
+                    }
+            )
     }
 }
 

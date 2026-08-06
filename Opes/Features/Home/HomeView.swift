@@ -50,7 +50,7 @@ struct HomeView: View {
                 }
             }
         }
-        .addProfileButtonToToolbar(isProfilePresented: $isProfilePresented, placement: .topBarPinnedTrailing, preButtonSpacer: .fixed)
+        .addProfileButtonToToolbar(isProfilePresented: $isProfilePresented)
         .scrollHidingNavigationHeader()
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()
@@ -218,7 +218,7 @@ private struct DashboardConfigurationView: View {
 }
 
 #Preview {
-    NavigationStack { HomeView() }
+    NavigationStack { HomeView(isProfilePresented: .constant(false)) }
         .environmentObject(AccountStore())
         .environmentObject(DashboardStore(defaults: UserDefaults(suiteName: "HomePreview")!))
 }

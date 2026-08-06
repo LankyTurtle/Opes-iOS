@@ -24,37 +24,11 @@ struct ProfileButton: View {
 
 extension View {
 
-    /// Pins the profile button to the trailing edge of the top toolbar.
-    /// - Parameter
-    ///     - isProfilePresented: A binding to a Boolean value that determines whether the profile sheet is presented.
-    /// - Returns: A view with the profile button added to the toolbar.
+    /// Adds the profile button as an independent trailing toolbar item.
     func addProfileButtonToToolbar(isProfilePresented: Binding<Bool>) -> some View {
         self.toolbar {
-            ToolbarItem(placement: .topBarPinnedTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
                 ProfileButton(isProfilePresented: isProfilePresented)
-            }
-        }
-    }
-
-    /// Pins the profile button to the specified placement in the toolbar.
-    /// - Parameter
-    ///     - isProfilePresented: A binding to a Boolean value that determines whether the profile sheet is presented.
-    ///     - placement: The placement for the toolbar item.
-    ///     - preButtonSpacer: An optional spacer to add before the profile button.
-    ///     - postButtonSpacer: An optional spacer to add after the profile button.
-    /// - Returns: A view with the profile button added to the toolbar.
-    func addProfileButtonToToolbar(isProfilePresented: Binding<Bool>, placement: ToolbarItemPlacement, preButtonSpacer: SpacerSizing? = nil, postButtonSpacer: SpacerSizing? = nil) -> some View {
-        self.toolbar {
-            if let preButtonSpacer {
-                ToolbarSpacer(preButtonSpacer, placement: placement)
-            }
-
-            ToolbarItem(placement: placement) {
-                ProfileButton(isProfilePresented: isProfilePresented)
-            }
-            
-            if let postButtonSpacer {
-                ToolbarSpacer(postButtonSpacer, placement: placement)
             }
         }
     }

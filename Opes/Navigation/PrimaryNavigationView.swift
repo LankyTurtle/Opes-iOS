@@ -8,8 +8,13 @@ struct PrimaryNavigationView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView(isProfilePresented: $isProfilePresented)
-            
+            createTabNavigationStack(
+                title: PrimaryTab.home.title,
+                image: PrimaryTab.home.icon,
+                tag: .home
+            ) {
+                HomeView(isProfilePresented: $isProfilePresented)
+            }
             profileTab(.accounts) { AccountsView() }
             profileTab(.transactions) { TransactionsView() }
             profileTab(.budgets) { BudgetsView() }

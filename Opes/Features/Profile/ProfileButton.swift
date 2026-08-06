@@ -22,6 +22,62 @@ struct ProfileButton: View {
     }
 }
 
+private struct ProfileToolbarModifier<ToolbarItems: ToolbarContent>: ViewModifier {
+    @Environment(\.profileToolbarContext)
+    private var profileContext
+
+    private let placement: ToolbarItemPlacement
+    private let preButtonSpacer: SpacerSizing?
+    private let postButtonSpacer: SpacerSizing?
+    private let toolbarItems: () -> ToolbarItems
+
+    init(
+        placement: ToolbarItemPlacement,
+        preButtonSpacer: SpacerSizing?,
+        postButtonSpacer: SpacerSizing?,
+        @ToolbarContentBuilder toolbarItems: @escaping () -> ToolbarItems
+    ) {
+        self.placement = placement
+        self.preButtonSpacer = preButtonSpacer
+        self.postButtonSpacer = postButtonSpacer
+        self.toolbarItems = toolbarItems
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                toolbarItems()
+
+                if let preButtonSpacer {
+                    ToolbarSpacer(
+                        preButtonSpacer,
+                        placement: placement
+                    )
+                }
+
+                if let profileContext {
+                    ToolbarItem(placement: placement) {
+                        ProfileButton(
+                            isProfilePresented:
+                                profileContext.isProfilePresented
+                        )
+                    }
+                    .matchedTransitionSource(
+                        id: profileContext.transitionID,
+                        in: profileContext.namespace
+                    )
+                }
+
+                if let postButtonSpacer {
+                    ToolbarSpacer(
+                        postButtonSpacer,
+                        placement: placement
+                    )
+                }
+            }
+    }
+}
+
 extension View {
 
     /// Pins the profile button to the trailing edge of the top toolbar.
@@ -64,27 +120,19 @@ extension View {
         }
     }
 
-    func profileToolbar<Content: ToolbarContent>(
-        isProfilePresented: Binding<Bool>,
+    func profileToolbar<ToolbarItems: ToolbarContent>(
         placement: ToolbarItemPlacement = .topBarTrailing,
         preButtonSpacer: SpacerSizing? = nil,
         postButtonSpacer: SpacerSizing? = nil,
-        @ToolbarContentBuilder content: () -> Content
+        @ToolbarContentBuilder content: @escaping () -> ToolbarItems
     ) -> some View {
-        self.toolbar {
-            content()
-
-            if let preButtonSpacer {
-                ToolbarSpacer(preButtonSpacer, placement: placement)
-            }
-
-            ToolbarItem(placement: placement) {
-                ProfileButton(isProfilePresented: isProfilePresented)
-            }
-
-            if let postButtonSpacer {
-                ToolbarSpacer(postButtonSpacer, placement: placement)
-            }
-        }
+        modifier(
+            ProfileToolbarModifier(
+                placement: placement,
+                preButtonSpacer: preButtonSpacer,
+                postButtonSpacer: postButtonSpacer,
+                toolbarItems: content
+            )
+        )
     }
 }

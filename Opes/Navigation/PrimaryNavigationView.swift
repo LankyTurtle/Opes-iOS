@@ -8,13 +8,7 @@ struct PrimaryNavigationView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            createTabNavigationStack(
-                title: PrimaryTab.home.title,
-                image: PrimaryTab.home.icon,
-                tag: .home
-            ) {
-                HomeView(isProfilePresented: $isProfilePresented)
-            }
+            profileTab(.home) { HomeView() }
             profileTab(.accounts) { AccountsView() }
             profileTab(.transactions) { TransactionsView() }
             profileTab(.budgets) { BudgetsView() }
@@ -38,14 +32,20 @@ struct PrimaryNavigationView: View {
         _ tab: PrimaryTab,
         @ViewBuilder content: @escaping () -> Content
     ) -> some TabContent<PrimaryTab> {
-        createTabNavigationStack(title: tab.title, image: tab.icon, tag: tab) {
+        createTabNavigationStack(
+            title: tab.title,
+            image: tab.icon,
+            tag: tab
+        ) {
             content()
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        ProfileButton(isProfilePresented: $isProfilePresented)
-                            .matchedTransitionSource(id: tab, in: profileTransition)
-                    }
-                }
-            }
+                .environment(
+                    \.profileToolbarContext,
+                    ProfileToolbarContext(
+                        isProfilePresented: $isProfilePresented,
+                        transitionID: AnyHashable(tab),
+                        namespace: profileTransition
+                    )
+                )
+        }
     }
 }

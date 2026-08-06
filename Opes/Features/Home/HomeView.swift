@@ -3,7 +3,6 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var dashboardStore: DashboardStore
     @State private var showingConfiguration = false
-    @Binding var isProfilePresented: Bool
 
     var body: some View {
         List {
@@ -37,7 +36,7 @@ struct HomeView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .pageTitle("Home", displayMode: .inlineLarge)
-        .profileToolbar(isProfilePresented: $isProfilePresented, placement: .topBarTrailing, preButtonSpacer: .fixed) {
+        .profileToolbar(placement: .topBarTrailing, preButtonSpacer: .fixed) {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showingConfiguration = true
@@ -218,7 +217,7 @@ private struct DashboardConfigurationView: View {
 }
 
 #Preview {
-    NavigationStack { HomeView(isProfilePresented: .constant(false)) }
+    NavigationStack { HomeView() }
         .environmentObject(AccountStore())
         .environmentObject(DashboardStore(defaults: UserDefaults(suiteName: "HomePreview")!))
 }

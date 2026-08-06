@@ -50,16 +50,6 @@ private struct ScrollHidingNavigationHeader: ViewModifier {
 }
 
 extension View {
-    /// Applies the standard navigation title treatment for a root page.
-    func pageTitle(
-        _ title: String,
-        displayMode: ToolbarTitleDisplayMode = .inlineLarge
-    ) -> some View {
-        self
-            .navigationTitle(title)
-            .toolbarTitleDisplayMode(displayMode)
-    }
-
     /// Hides the navigation header while scrolling down and reveals it while scrolling up.
     func scrollHidingNavigationHeader() -> some View {
         modifier(ScrollHidingNavigationHeader())

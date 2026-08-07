@@ -20,6 +20,10 @@ private struct PageTitleViewModifier: ViewModifier {
                     Text(title)
                         .font(.title2.weight(.bold))
                         .lineLimit(1)
+                        // Without this the bar hands the title its minimum
+                        // width and truncates it to a single character, even
+                        // with the rest of the bar empty.
+                        .fixedSize()
                         .accessibilityAddTraits(.isHeader)
                 }
                 // A title is not a control, so it opts out of the glass

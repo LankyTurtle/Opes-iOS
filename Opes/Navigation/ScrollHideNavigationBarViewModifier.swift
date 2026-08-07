@@ -27,6 +27,11 @@ private struct ScrollHideNavigationBarViewModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollEdgeEffectStyle(.soft, for: .top)
+            // The edge effect belongs to the scroll view rather than to the
+            // bar, so it outlives a bar that hides: its blurred band stays at
+            // the top of the content with nothing above it, reading as a hard
+            // boundary. Retire it alongside the bar it exists to protect.
+            .scrollEdgeEffectHidden(isNavigationBarHidden, for: .top)
             .toolbarVisibility(
                 isNavigationBarHidden ? .hidden : .visible,
                 for: .navigationBar

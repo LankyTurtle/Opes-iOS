@@ -1,43 +1,63 @@
 import SwiftUI
+import UIKit
 
 private struct ScrollHideNavigationBarViewModifier: ViewModifier {
-    @State private var isHeaderHidden = false
-    @State private var previousTranslation: CGFloat = 0
-
-    private let directionThreshold: CGFloat = 4
-
     func body(content: Content) -> some View {
-        content
-            .toolbarVisibility(
-                isHeaderHidden ? .hidden : .visible,
-                for: .navigationBar
-            )
-            .simultaneousGesture(
-                DragGesture()
-                    .onChanged { value in
-                        let currentTranslation = value.translation.height
-                        let delta = currentTranslation - previousTranslation
+        content.background {
+            NavigationBarScrollHidingController()
+                .frame(width: 0, height: 0)
+        }
+    }
+}
 
-                        guard abs(delta) >= directionThreshold else {
-                            return
-                        }
+/// Enables UINavigationController's scroll-aware bar transition without
+/// changing SwiftUI state while a scroll view is laying itself out.
+private struct NavigationBarScrollHidingController: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller {
+        Controller()
+    }
 
-                        if delta < 0 {
-                            // Finger moving up:
-                            // content is scrolling down.
-                            isHeaderHidden = true
-                        } else {
-                            // Finger moving down:
-                            // content is scrolling up.
-                            isHeaderHidden = false
-                        }
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.enableScrollHiding()
+    }
 
-                        previousTranslation = currentTranslation
-                    }
-                    .onEnded { _ in
-                        previousTranslation = 0
-                    }
-            )
+    static func dismantleUIViewController(_ controller: Controller, coordinator: Void) {
+        controller.disableScrollHiding()
+    }
+
+    final class Controller: UIViewController {
+        private weak var configuredNavigationController: UINavigationController?
+        private var previousHidesBarsOnSwipe = false
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            enableScrollHiding()
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            disableScrollHiding()
+        }
+
+        func enableScrollHiding() {
+            guard viewIfLoaded?.window != nil,
+                  let navigationController,
+                  navigationController !== configuredNavigationController else {
+                return
+            }
+
+            disableScrollHiding()
+            previousHidesBarsOnSwipe = navigationController.hidesBarsOnSwipe
+            navigationController.hidesBarsOnSwipe = true
+            configuredNavigationController = navigationController
+        }
+
+        func disableScrollHiding() {
+            guard let configuredNavigationController else { return }
+
+            configuredNavigationController.hidesBarsOnSwipe = previousHidesBarsOnSwipe
+            self.configuredNavigationController = nil
+        }
     }
 }
 

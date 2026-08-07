@@ -14,6 +14,7 @@ func createTabNavigationStack<Content: View, Tag: Hashable>(
     tag: Tag,
     @ViewBuilder content: @escaping () -> Content
 ) -> some TabContent<Tag> {
-    Tab(title, systemImage: image, value: tag)
-        { NavigationStack { content() } }
+    Tab(title, systemImage: image, value: tag) {
+        NavigationStack { content() }
+    }
 }

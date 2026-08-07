@@ -35,7 +35,7 @@ struct HomeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Home", displayMode: .inlineLarge)
+        .pageTitle("Home")
         .profileToolbar(placement: .topBarTrailing, preButtonSpacer: .fixed) {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {

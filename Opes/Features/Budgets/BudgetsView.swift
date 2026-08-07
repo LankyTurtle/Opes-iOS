@@ -46,7 +46,7 @@ struct BudgetsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Budgets", displayMode: .inlineLarge)
+        .pageTitle("Budgets")
         .scrollHideNavigationBar()
     }
 

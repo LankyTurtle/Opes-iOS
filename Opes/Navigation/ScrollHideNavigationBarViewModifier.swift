@@ -1,132 +1,75 @@
 import SwiftUI
+import UIKit
 
-/// Hides the navigation bar while the user scrolls down and restores it on
-/// scroll up, fading the bar and every item in it as a single unit.
+/// Hands the navigation bar's hide-on-scroll behaviour to UIKit.
+///
+/// `toolbarVisibility(_:for:)` cannot express this on iOS 26. It withdraws the
+/// bar's background and the scroll edge effect that goes with it, but leaves
+/// the floating Liquid Glass items in place, so the content runs under the
+/// buttons with no surface left to dissolve into.
+/// `UINavigationController.hidesBarsOnSwipe` moves the bar, the items inside it
+/// and the scroll view's content insets from one place, which is what makes the
+/// transition read as a single coordinated movement rather than as two things
+/// animating past each other.
 private struct ScrollHideNavigationBarViewModifier: ViewModifier {
-    @State private var isNavigationBarHidden = false
-    @State private var isScrollDrivenByUser = false
-
-    /// The offset the current direction is measured from.
-    @State private var anchorOffset: CGFloat = 0
-
-    /// The top content inset the anchor was taken against. A change means the
-    /// safe area resized rather than the user scrolling.
-    @State private var anchorInset: CGFloat?
-
-    /// Set while the scroll view is still absorbing a bar toggle, so the offset
-    /// that toggle produces is never read back as user input.
-    @State private var isSettlingAfterToggle = false
-
-    /// Distance the user must travel against the current direction before the
-    /// bar reacts, so small scroll corrections do not toggle it. Doubles as the
-    /// band at the top of the content within which the bar is always shown.
-    private let scrollThreshold: CGFloat = 24
-
-    private let transition = Animation.easeInOut(duration: 0.25)
-
     func body(content: Content) -> some View {
         content
             .scrollEdgeEffectStyle(.soft, for: .top)
-            // The edge effect belongs to the scroll view rather than to the
-            // bar, so it outlives a bar that hides: its blurred band stays at
-            // the top of the content with nothing above it, reading as a hard
-            // boundary. Retire it alongside the bar it exists to protect.
-            .scrollEdgeEffectHidden(isNavigationBarHidden, for: .top)
-            .toolbarVisibility(
-                isNavigationBarHidden ? .hidden : .visible,
-                for: .navigationBar
-            )
-            .onScrollPhaseChange { _, phase in
-                isScrollDrivenByUser = phase.isDrivenByUser
-            }
-            .onScrollGeometryChange(for: ScrollSample.self) { geometry in
-                ScrollSample(
-                    offset: geometry.contentOffset.y,
-                    topInset: geometry.contentInsets.top
-                )
-            } action: { _, sample in
-                react(to: sample)
-            }
-    }
-
-    private func react(to sample: ScrollSample) {
-        // Showing or hiding the bar resizes the safe area, which moves the
-        // content offset without the user having scrolled. Reading that back as
-        // a direction change is what makes the bar oscillate, so re-anchor on
-        // it and wait for the next genuine sample instead.
-        guard anchorInset == sample.topInset, !isSettlingAfterToggle else {
-            reanchor(at: sample)
-            return
-        }
-
-        // The top of the content, and the rubber band above it, always show the
-        // bar so the user can never be left without it.
-        guard sample.offset + sample.topInset > scrollThreshold else {
-            anchorOffset = sample.offset
-            setNavigationBar(hidden: false)
-            return
-        }
-
-        // Momentum counts as the user scrolling; a programmatic scroll or a
-        // layout pass does not.
-        guard isScrollDrivenByUser else {
-            anchorOffset = sample.offset
-            return
-        }
-
-        let travel = sample.offset - anchorOffset
-        let isScrollingDown = travel > 0
-
-        // While travelling in the direction the bar already reflects, keep the
-        // anchor at the furthest point reached so that a reversal is measured
-        // from there rather than from the previous sample.
-        guard isNavigationBarHidden != isScrollingDown else {
-            anchorOffset = sample.offset
-            return
-        }
-
-        guard abs(travel) >= scrollThreshold else { return }
-
-        anchorOffset = sample.offset
-        setNavigationBar(hidden: isScrollingDown)
-    }
-
-    private func reanchor(at sample: ScrollSample) {
-        anchorInset = sample.topInset
-        anchorOffset = sample.offset
-        isSettlingAfterToggle = false
-    }
-
-    private func setNavigationBar(hidden: Bool) {
-        guard isNavigationBarHidden != hidden else { return }
-
-        isSettlingAfterToggle = true
-
-        withAnimation(transition) {
-            isNavigationBarHidden = hidden
-        }
+            .background(NavigationBarSwipeHider())
     }
 }
 
-/// The part of a scroll view's geometry the bar reacts to.
-private struct ScrollSample: Equatable {
-    let offset: CGFloat
-    let topInset: CGFloat
+/// Turns `hidesBarsOnSwipe` on for the navigation controller backing the
+/// surrounding `NavigationStack`.
+private struct NavigationBarSwipeHider: UIViewControllerRepresentable {
+    func makeUIViewController(
+        context: Context
+    ) -> NavigationBarSwipeHiderViewController {
+        NavigationBarSwipeHiderViewController()
+    }
+
+    func updateUIViewController(
+        _ controller: NavigationBarSwipeHiderViewController,
+        context: Context
+    ) {}
 }
 
-private extension ScrollPhase {
+/// An inert child view controller, present only to reach the navigation
+/// controller SwiftUI keeps to itself.
+private final class NavigationBarSwipeHiderViewController: UIViewController {
+    override func loadView() {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        self.view = view
+    }
 
-    /// Whether the offset is moving because of the user rather than because of
-    /// code or a layout change.
-    var isDrivenByUser: Bool {
-        self == .interacting || self == .decelerating
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        navigationController?.hidesBarsOnSwipe = true
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+
+        guard let navigationController else { return }
+
+        // A pushed screen shares this navigation controller, so leave it as it
+        // was found rather than letting it inherit a bar that swipes away, or
+        // worse, one that is currently hidden.
+        navigationController.hidesBarsOnSwipe = false
+
+        if navigationController.isNavigationBarHidden {
+            navigationController.setNavigationBarHidden(false, animated: animated)
+        }
     }
 }
 
 extension View {
 
-    /// Fades the navigation bar out as the view scrolls down and back in as it
-    /// scrolls up.
+    /// Hides the navigation bar while the user swipes up through the content
+    /// and restores it when they swipe back down.
     /// - Returns: A view whose navigation bar follows the scroll direction.
     func scrollHideNavigationBar() -> some View {
         modifier(ScrollHideNavigationBarViewModifier())

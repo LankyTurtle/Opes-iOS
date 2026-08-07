@@ -35,22 +35,20 @@ struct HomeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Home")
-        .profileToolbar(placement: .topBarTrailing, preButtonSpacer: .fixed) {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    showingConfiguration = true
-                }
-                label: {
-                    Label("Configure tiles", systemImage: "slider.horizontal.3")
-                }
-
-                if !dashboardStore.visibleTiles.isEmpty {
-                    EditButton()
-                }
-            }
-        }
-        .scrollHideNavigationBar()
+        .navigationBar(
+            title: "Home",
+            items: [
+                .button(
+                    NavigationBarButton(
+                        id: "configure",
+                        systemImage: "slider.horizontal.3",
+                        label: "Configure tiles",
+                        action: { showingConfiguration = true }
+                    )
+                ),
+                .profile
+            ]
+        )
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()
         }
@@ -195,7 +193,7 @@ private struct DashboardConfigurationView: View {
                 } header: {
                     Text("Visible tiles")
                 } footer: {
-                    Text("Turn tiles on or off. Use Edit on the homepage to drag them into your preferred order.")
+                    Text("Turn tiles on or off.")
                 }
             }
             .navigationTitle("Configure Home")

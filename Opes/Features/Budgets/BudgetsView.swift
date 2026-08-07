@@ -46,8 +46,7 @@ struct BudgetsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Budgets")
-        .scrollHideNavigationBar()
+        .navigationBar(title: "Budgets")
     }
 
     private func decimalDouble(_ value: Decimal) -> Double {

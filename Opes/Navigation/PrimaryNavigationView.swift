@@ -2,50 +2,40 @@ import SwiftUI
 
 /// Coordinates the app's primary tab navigation and presents each feature's root view.
 struct PrimaryNavigationView: View {
+    @EnvironmentObject private var session: SessionStore
+    @EnvironmentObject private var accountStore: AccountStore
+    @EnvironmentObject private var dashboardStore: DashboardStore
+
     @State private var selectedTab = PrimaryTab.home
-    @State private var isProfilePresented = false
-    @Namespace private var profileTransition
+
+    private var navigationEnvironment: NavigationEnvironment {
+        NavigationEnvironment(
+            session: session,
+            accountStore: accountStore,
+            dashboardStore: dashboardStore
+        )
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            profileTab(.home) { HomeView() }
-            profileTab(.accounts) { AccountsView() }
-            profileTab(.transactions) { TransactionsView() }
-            profileTab(.budgets) { BudgetsView() }
+            tab(.home) { HomeView() }
+            tab(.accounts) { AccountsView() }
+            tab(.transactions) { TransactionsView() }
+            tab(.budgets) { BudgetsView() }
         }
         .tint(.opesPrimary)
-        .sheet(isPresented: $isProfilePresented) {
-            NavigationStack {
-                ProfileView()
-            }
-            .navigationTransition(
-                .zoom(
-                    sourceID: selectedTab,
-                    in: profileTransition
-                )
-            )
-            .presentationDetents([.large])
-        }
     }
 
-    private func profileTab<Content: View>(
+    private func tab<Content: View>(
         _ tab: PrimaryTab,
         @ViewBuilder content: @escaping () -> Content
     ) -> some TabContent<PrimaryTab> {
         createTabNavigationStack(
             title: tab.title,
             image: tab.icon,
-            tag: tab
-        ) {
-            content()
-                .environment(
-                    \.profileToolbarContext,
-                    ProfileToolbarContext(
-                        isProfilePresented: $isProfilePresented,
-                        transitionID: AnyHashable(tab),
-                        namespace: profileTransition
-                    )
-                )
-        }
+            tag: tab,
+            environment: navigationEnvironment,
+            content: content
+        )
     }
 }

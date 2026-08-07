@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AccountsView: View {
     @EnvironmentObject private var accountStore: AccountStore
+    @Environment(\.navigationBarHost) private var navigationBarHost
     @AppStorage("accounts.sortOption") private var sortOptionRawValue =
         AccountSortOption.displayName.rawValue
     @State private var editorContext: AccountEditorContext?
@@ -35,11 +36,18 @@ struct AccountsView: View {
             } else {
                 Section {
                     ForEach(sortedAccounts) { account in
-                        NavigationLink {
-                            AccountView(account: account)
+                        Button {
+                            navigationBarHost?.push(AccountView(account: account))
                         } label: {
-                            AccountTile(account: account)
+                            HStack(spacing: 12) {
+                                AccountTile(account: account)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                        .buttonStyle(.plain)
                         .listRowInsets(
                             EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12)
                         )
@@ -69,29 +77,34 @@ struct AccountsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Accounts")
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Menu {
-                    Picker("Sort accounts", selection: $sortOptionRawValue) {
-                        ForEach(AccountSortOption.allCases) { option in
-                            Label(option.title, systemImage: option.icon)
-                                .tag(option.rawValue)
-                        }
-                    }
-                } label: {
-                    Label("Sort accounts", systemImage: "arrow.up.arrow.down")
-                }
-
-                Button {
-                    editorContext = .add
-                } label: {
-                    Label("Add account", systemImage: "plus")
-                }
-
-            }
-        }
-        .scrollHideNavigationBar()
+        .navigationBar(
+            title: "Accounts",
+            items: [
+                .menu(
+                    NavigationBarMenu(
+                        id: "sort",
+                        systemImage: "arrow.up.arrow.down",
+                        label: "Sort accounts",
+                        options: AccountSortOption.allCases.map { option in
+                            NavigationBarMenu.Option(
+                                id: option.rawValue,
+                                title: option.title,
+                                systemImage: option.icon
+                            )
+                        },
+                        selection: $sortOptionRawValue
+                    )
+                ),
+                .button(
+                    NavigationBarButton(
+                        id: "add",
+                        systemImage: "plus",
+                        label: "Add account",
+                        action: { editorContext = .add }
+                    )
+                )
+            ]
+        )
         .sheet(item: $editorContext) { context in
             AccountEditorView(account: context.account) { account in
                 if context.account == nil {

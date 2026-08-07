@@ -19,8 +19,7 @@ struct TransactionsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .pageTitle("Transactions")
-        .scrollHideNavigationBar()
+        .navigationBar(title: "Transactions")
     }
 }
 

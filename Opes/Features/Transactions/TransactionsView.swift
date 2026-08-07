@@ -20,8 +20,6 @@ struct TransactionsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
         .pageTitle("Transactions", displayMode: .inlineLarge)
-        .toolbar {
-        }
         .scrollHideNavigationBar()
     }
 }

@@ -17,6 +17,11 @@ struct UIKitNavigationStack<Root: View>: UIViewControllerRepresentable {
                 .environment(\.navigationBarHost, host)
         )
 
+        // Content stops at the bar rather than running beneath it, so that
+        // scrolling pushes the bar up and out of the way instead of sliding
+        // the view under a bar it stays visible through.
+        rootController.edgesForExtendedLayout = []
+
         let navigationController = UINavigationController(
             rootViewController: rootController
         )

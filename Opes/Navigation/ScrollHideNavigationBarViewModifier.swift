@@ -2,110 +2,156 @@ import SwiftUI
 import UIKit
 
 private struct ScrollHideNavigationBarViewModifier: ViewModifier {
+    @State private var isNavigationBarHidden = false
+    @State private var previousOffset: CGFloat = 0
+
+    private let scrollThreshold: CGFloat = 12
+
     func body(content: Content) -> some View {
-        content.background {
-            NavigationBarScrollHidingController()
-                .frame(width: 0, height: 0)
-        }
+        content
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, newOffset in
+                if newOffset <= 0 {
+                    isNavigationBarHidden = false
+                    previousOffset = 0
+                    return
+                }
+
+                let difference = newOffset - previousOffset
+                guard abs(difference) >= scrollThreshold else { return }
+
+                isNavigationBarHidden = difference > 0
+                previousOffset = newOffset
+            }
+            .background {
+                NavigationBarFadingController(isHidden: isNavigationBarHidden)
+                    .frame(width: 0, height: 0)
+            }
     }
 }
 
-/// Enables UINavigationController's scroll-aware bar transition without
-/// changing SwiftUI state while a scroll view is laying itself out.
-private struct NavigationBarScrollHidingController: UIViewControllerRepresentable {
+/// Crossfades the complete navigation bar while leaving its geometry fixed.
+private struct NavigationBarFadingController: UIViewControllerRepresentable {
+    let isHidden: Bool
+
     func makeUIViewController(context: Context) -> Controller {
         Controller()
     }
 
     func updateUIViewController(_ controller: Controller, context: Context) {
-        controller.enableScrollHiding()
+        controller.update(isHidden: isHidden)
     }
 
     static func dismantleUIViewController(_ controller: Controller, coordinator: Void) {
-        controller.disableScrollHiding()
+        controller.restoreNavigationBar()
     }
 
     final class Controller: UIViewController {
         private weak var configuredNavigationController: UINavigationController?
         private var previousHidesBarsOnSwipe = false
-        private var isNavigationBarFaded = false
+        private var shouldHideNavigationBar = false
+        private var appliedNavigationBarHidden: Bool?
+        private weak var blurOverlay: UIVisualEffectView?
 
-        private let fadeDuration: TimeInterval = 0.2
-        private let fadeTranslationThreshold: CGFloat = 8
-        private let fadeVelocityThreshold: CGFloat = 20
+        private let transitionDuration: TimeInterval = 0.28
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            enableScrollHiding()
+            configureNavigationControllerIfNeeded()
+            applyNavigationBarVisibility(animated: false)
         }
 
         override func viewWillDisappear(_ animated: Bool) {
             super.viewWillDisappear(animated)
-            disableScrollHiding()
+            restoreNavigationBar()
         }
 
-        func enableScrollHiding() {
+        func update(isHidden: Bool) {
+            shouldHideNavigationBar = isHidden
+            configureNavigationControllerIfNeeded()
+            applyNavigationBarVisibility(animated: true)
+        }
+
+        func restoreNavigationBar() {
+            guard let configuredNavigationController else { return }
+
+            configuredNavigationController.navigationBar.layer.removeAllAnimations()
+            configuredNavigationController.navigationBar.alpha = 1
+            blurOverlay?.layer.removeAllAnimations()
+            blurOverlay?.removeFromSuperview()
+            configuredNavigationController.hidesBarsOnSwipe = previousHidesBarsOnSwipe
+            appliedNavigationBarHidden = nil
+            self.configuredNavigationController = nil
+        }
+
+        private func configureNavigationControllerIfNeeded() {
             guard viewIfLoaded?.window != nil,
                   let navigationController,
                   navigationController !== configuredNavigationController else {
                 return
             }
 
-            disableScrollHiding()
+            restoreNavigationBar()
             previousHidesBarsOnSwipe = navigationController.hidesBarsOnSwipe
-            navigationController.hidesBarsOnSwipe = true
-            navigationController.barHideOnSwipeGestureRecognizer.addTarget(
-                self,
-                action: #selector(navigationBarSwipeChanged(_:))
-            )
+            navigationController.hidesBarsOnSwipe = false
             configuredNavigationController = navigationController
         }
 
-        func disableScrollHiding() {
-            guard let configuredNavigationController else { return }
-
-            configuredNavigationController.barHideOnSwipeGestureRecognizer.removeTarget(
-                self,
-                action: #selector(navigationBarSwipeChanged(_:))
-            )
-            configuredNavigationController.navigationBar.layer.removeAllAnimations()
-            configuredNavigationController.navigationBar.alpha = 1
-            configuredNavigationController.hidesBarsOnSwipe = previousHidesBarsOnSwipe
-            isNavigationBarFaded = false
-            self.configuredNavigationController = nil
-        }
-
-        @objc
-        private func navigationBarSwipeChanged(_ gesture: UIPanGestureRecognizer) {
-            guard gesture.state == .began || gesture.state == .changed else { return }
-
-            let translation = gesture.translation(in: gesture.view).y
-            guard abs(translation) >= fadeTranslationThreshold else { return }
-
-            let velocity = gesture.velocity(in: gesture.view).y
-
-            if velocity <= -fadeVelocityThreshold {
-                setNavigationBarFaded(true)
-            } else if velocity >= fadeVelocityThreshold {
-                setNavigationBarFaded(false)
-            }
-        }
-
-        private func setNavigationBarFaded(_ isFaded: Bool) {
-            guard isNavigationBarFaded != isFaded,
+        private func applyNavigationBarVisibility(animated: Bool) {
+            guard appliedNavigationBarHidden != shouldHideNavigationBar,
                   let navigationBar = configuredNavigationController?.navigationBar else {
                 return
             }
 
-            isNavigationBarFaded = isFaded
+            appliedNavigationBarHidden = shouldHideNavigationBar
+
+            let blurOverlay = prepareBlurOverlay(in: navigationBar)
+            let changes = {
+                navigationBar.alpha = self.shouldHideNavigationBar ? 0 : 1
+                blurOverlay.alpha = self.shouldHideNavigationBar ? 1 : 0
+            }
+
+            guard animated else {
+                navigationBar.layer.removeAllAnimations()
+                blurOverlay.layer.removeAllAnimations()
+                changes()
+                removeBlurOverlayIfVisible()
+                return
+            }
 
             UIView.animate(
-                withDuration: fadeDuration,
+                withDuration: transitionDuration,
                 delay: 0,
-                options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut]
-            ) {
-                navigationBar.alpha = isFaded ? 0 : 1
+                options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseInOut],
+                animations: changes
+            ) { finished in
+                guard finished else { return }
+                self.removeBlurOverlayIfVisible()
             }
+        }
+
+        private func prepareBlurOverlay(in navigationBar: UINavigationBar) -> UIVisualEffectView {
+            if let blurOverlay {
+                navigationBar.bringSubviewToFront(blurOverlay)
+                return blurOverlay
+            }
+
+            let blurOverlay = UIVisualEffectView(
+                effect: UIBlurEffect(style: .systemUltraThinMaterial)
+            )
+            blurOverlay.frame = navigationBar.bounds
+            blurOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            blurOverlay.isUserInteractionEnabled = false
+            blurOverlay.alpha = shouldHideNavigationBar ? 0 : 1
+            navigationBar.addSubview(blurOverlay)
+            self.blurOverlay = blurOverlay
+            return blurOverlay
+        }
+
+        private func removeBlurOverlayIfVisible() {
+            guard !shouldHideNavigationBar else { return }
+            blurOverlay?.removeFromSuperview()
         }
     }
 }

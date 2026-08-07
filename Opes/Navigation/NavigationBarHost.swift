@@ -79,7 +79,14 @@ final class NavigationBarHost: NSObject {
         // A label carried as a custom view keeps its size, weight and leading
         // position in every orientation, which is the whole reason the title is
         // not left to the bar's own title handling.
-        return UIBarButtonItem(customView: label)
+        let item = UIBarButtonItem(customView: label)
+
+        // Bar button items are grouped into a shared Liquid Glass background by
+        // default, which puts the title in a capsule as though it were an
+        // action. A title is not a control, so it opts out.
+        item.hidesSharedBackground = true
+
+        return item
     }
 
     private func makeItem(_ item: NavigationBarItem) -> UIBarButtonItem {

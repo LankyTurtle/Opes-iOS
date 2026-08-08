@@ -71,12 +71,37 @@ private struct NavigationBackTitleViewModifier: ViewModifier {
     }
 }
 
+private struct NavigationBarViewModifier: ViewModifier {
+    let configuration: NavigationBarConfiguration
+
+    @Environment(\.navigationBarHost) private var host
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: configuration.signature, initial: true) { _, _ in
+                host?.apply(configuration)
+            }
+    }
+}
+
 extension View {
+
+    /// Describes the title and actions shown in a tab root's top toolbar.
+    func navigationBar(
+        title: String,
+        items: [NavigationBarItem] = []
+    ) -> some View {
+        modifier(
+            NavigationBarViewModifier(
+                configuration: NavigationBarConfiguration(title: title, items: items)
+            )
+        )
+    }
 
     /// Names this screen for the back button of anything pushed from it.
     ///
-    /// A tab's root screen has no navigation bar of its own, so this is the
-    /// only place its title is still needed.
+    /// Roots without a top toolbar use this to provide a pushed screen's back
+    /// button title.
     /// - Parameter title: The screen's title.
     /// - Returns: A view that names itself to the surrounding stack.
     func navigationBackTitle(_ title: String) -> some View {

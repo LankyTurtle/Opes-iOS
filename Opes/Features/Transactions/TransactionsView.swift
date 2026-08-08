@@ -5,6 +5,8 @@ struct TransactionsView: View {
 
     var body: some View {
         List {
+            PageTitleRow(title: "Transactions", leadingInset: 20)
+
             Section {
                 ForEach(transactions) { transaction in
                     TransactionRow(transaction: transaction)

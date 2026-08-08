@@ -19,6 +19,8 @@ struct AccountsView: View {
 
     var body: some View {
         List {
+            PageTitleRow(title: "Accounts")
+
             if accountStore.accounts.isEmpty {
                 ContentUnavailableView {
                     Label("No accounts", systemImage: "creditcard")

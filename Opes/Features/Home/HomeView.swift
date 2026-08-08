@@ -6,6 +6,8 @@ struct HomeView: View {
 
     var body: some View {
         List {
+            PageTitleRow(title: "Home")
+
             if dashboardStore.visibleTiles.isEmpty {
                 ContentUnavailableView {
                     Label("No dashboard tiles", systemImage: "rectangle.grid.1x2")

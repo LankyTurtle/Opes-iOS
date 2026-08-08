@@ -46,11 +46,9 @@ final class NavigationBarHost: NSObject {
     func apply(_ configuration: NavigationBarConfiguration) {
         guard let rootItem else { return }
 
-        rootItem.leftBarButtonItem = makeTitleItem(configuration.title)
-
-        // A pushed screen reads its back button's title from the item it was
-        // pushed from, which is the only place the title is still needed as
-        // text rather than as a view.
+        // The title lives in the scroll content so that it scrolls away with
+        // the view, leaving the bar to its actions. A pushed screen still
+        // reads its back button's text from here.
         rootItem.backButtonTitle = configuration.title
 
         // UIKit orders right bar button items from the trailing edge inwards,
@@ -64,29 +62,6 @@ final class NavigationBarHost: NSObject {
     func push<Content: View>(_ content: Content) {
         let controller = UIHostingController(rootView: environment.decorate(content))
         navigationController?.pushViewController(controller, animated: true)
-    }
-
-    private func makeTitleItem(_ title: String) -> UIBarButtonItem {
-        let label = UILabel()
-        label.text = title
-        label.textColor = .label
-        label.font = UIFontMetrics(forTextStyle: .title2)
-            .scaledFont(for: .systemFont(ofSize: 22, weight: .bold))
-        label.adjustsFontForContentSizeCategory = true
-        label.accessibilityTraits.insert(.header)
-        label.sizeToFit()
-
-        // A label carried as a custom view keeps its size, weight and leading
-        // position in every orientation, which is the whole reason the title is
-        // not left to the bar's own title handling.
-        let item = UIBarButtonItem(customView: label)
-
-        // Bar button items are grouped into a shared Liquid Glass background by
-        // default, which puts the title in a capsule as though it were an
-        // action. A title is not a control, so it opts out.
-        item.hidesSharedBackground = true
-
-        return item
     }
 
     private func makeItem(_ item: NavigationBarItem) -> UIBarButtonItem {

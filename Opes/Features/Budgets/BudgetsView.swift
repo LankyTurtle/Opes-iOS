@@ -13,6 +13,8 @@ struct BudgetsView: View {
 
     var body: some View {
         List {
+            PageTitleRow(title: "Budgets", leadingInset: 20)
+
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Spent this month")

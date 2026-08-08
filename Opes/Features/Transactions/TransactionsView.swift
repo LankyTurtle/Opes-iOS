@@ -5,7 +5,7 @@ struct TransactionsView: View {
 
     var body: some View {
         List {
-            PageTitleRow(title: "Transactions", leadingInset: 20)
+            PageHeaderRow(title: "Transactions", horizontalInset: 20)
 
             Section {
                 ForEach(transactions) { transaction in
@@ -21,7 +21,7 @@ struct TransactionsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationBar(title: "Transactions")
+        .navigationBackTitle("Transactions")
     }
 }
 

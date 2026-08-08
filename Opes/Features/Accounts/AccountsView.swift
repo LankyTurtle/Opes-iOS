@@ -19,7 +19,31 @@ struct AccountsView: View {
 
     var body: some View {
         List {
-            PageTitleRow(title: "Accounts")
+            PageHeaderRow(title: "Accounts") {
+                Menu {
+                    Picker("Sort accounts", selection: $sortOptionRawValue) {
+                        ForEach(AccountSortOption.allCases) { option in
+                            Label(option.title, systemImage: option.icon)
+                                .tag(option.rawValue)
+                        }
+                    }
+                } label: {
+                    Label("Sort accounts", systemImage: "arrow.up.arrow.down")
+                        .labelStyle(.iconOnly)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+
+                Button {
+                    editorContext = .add
+                } label: {
+                    Label("Add account", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+            }
 
             if accountStore.accounts.isEmpty {
                 ContentUnavailableView {
@@ -79,34 +103,7 @@ struct AccountsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationBar(
-            title: "Accounts",
-            items: [
-                .menu(
-                    NavigationBarMenu(
-                        id: "sort",
-                        systemImage: "arrow.up.arrow.down",
-                        label: "Sort accounts",
-                        options: AccountSortOption.allCases.map { option in
-                            NavigationBarMenu.Option(
-                                id: option.rawValue,
-                                title: option.title,
-                                systemImage: option.icon
-                            )
-                        },
-                        selection: $sortOptionRawValue
-                    )
-                ),
-                .button(
-                    NavigationBarButton(
-                        id: "add",
-                        systemImage: "plus",
-                        label: "Add account",
-                        action: { editorContext = .add }
-                    )
-                )
-            ]
-        )
+        .navigationBackTitle("Accounts")
         .sheet(item: $editorContext) { context in
             AccountEditorView(account: context.account) { account in
                 if context.account == nil {

@@ -6,7 +6,18 @@ struct HomeView: View {
 
     var body: some View {
         List {
-            PageTitleRow(title: "Home")
+            PageHeaderRow(title: "Home") {
+                Button {
+                    showingConfiguration = true
+                } label: {
+                    Label("Configure tiles", systemImage: "slider.horizontal.3")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+
+                ProfileHeaderButton()
+            }
 
             if dashboardStore.visibleTiles.isEmpty {
                 ContentUnavailableView {
@@ -37,20 +48,7 @@ struct HomeView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationBar(
-            title: "Home",
-            items: [
-                .button(
-                    NavigationBarButton(
-                        id: "configure",
-                        systemImage: "slider.horizontal.3",
-                        label: "Configure tiles",
-                        action: { showingConfiguration = true }
-                    )
-                ),
-                .profile
-            ]
-        )
+        .navigationBackTitle("Home")
         .sheet(isPresented: $showingConfiguration) {
             DashboardConfigurationView()
         }

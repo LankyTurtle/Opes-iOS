@@ -13,7 +13,7 @@ struct BudgetsView: View {
 
     var body: some View {
         List {
-            PageTitleRow(title: "Budgets", leadingInset: 20)
+            PageHeaderRow(title: "Budgets", horizontalInset: 20)
 
             Section {
                 VStack(alignment: .leading, spacing: 8) {
@@ -48,7 +48,7 @@ struct BudgetsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationBar(title: "Budgets")
+        .navigationBackTitle("Budgets")
     }
 
     private func decimalDouble(_ value: Decimal) -> Double {

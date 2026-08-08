@@ -58,34 +58,28 @@ extension EnvironmentValues {
     }
 }
 
-private struct NavigationBarViewModifier: ViewModifier {
-    let configuration: NavigationBarConfiguration
+private struct NavigationBackTitleViewModifier: ViewModifier {
+    let title: String
 
     @Environment(\.navigationBarHost) private var host
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: configuration.signature, initial: true) { _, _ in
-                host?.apply(configuration)
+            .onChange(of: title, initial: true) { _, _ in
+                host?.setBackTitle(title)
             }
     }
 }
 
 extension View {
 
-    /// Describes this screen's navigation bar for UIKit to build.
-    /// - Parameters:
-    ///   - title: The title pinned to the leading edge of the bar.
-    ///   - items: The bar's items, ordered leading to trailing.
-    /// - Returns: A view that keeps the surrounding bar in step with its state.
-    func navigationBar(
-        title: String,
-        items: [NavigationBarItem] = []
-    ) -> some View {
-        modifier(
-            NavigationBarViewModifier(
-                configuration: NavigationBarConfiguration(title: title, items: items)
-            )
-        )
+    /// Names this screen for the back button of anything pushed from it.
+    ///
+    /// A tab's root screen has no navigation bar of its own, so this is the
+    /// only place its title is still needed.
+    /// - Parameter title: The screen's title.
+    /// - Returns: A view that names itself to the surrounding stack.
+    func navigationBackTitle(_ title: String) -> some View {
+        modifier(NavigationBackTitleViewModifier(title: title))
     }
 }

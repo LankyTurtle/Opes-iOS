@@ -63,7 +63,6 @@ final class NavigationBarHost: NSObject {
     /// Pushes `content` onto this tab's stack.
     func push<Content: View>(_ content: Content) {
         let controller = UIHostingController(rootView: environment.decorate(content))
-        controller.edgesForExtendedLayout = []
         navigationController?.pushViewController(controller, animated: true)
     }
 

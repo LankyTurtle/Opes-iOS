@@ -4,7 +4,7 @@ import SwiftUI
 struct OpesApp: App {
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            RootView()
         }
     }
 }

@@ -7,7 +7,9 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 Tab(tab.title, systemImage: tab.icon, value: tab) {
-                    tab.destination
+                    NavigationStack {
+                        tab.destination
+                    }
                 }
             }
         }

@@ -19,9 +19,9 @@ enum AppTab: String, CaseIterable, Hashable, Identifiable {
         case .home:
             return "house.fill"
         case .accounts:
-            return "arrow.left.arrow.right"
+            return "wallet.pass.fill"
         case .transactions:
-            return "list.bullet.rectangle.portrait"
+            return "arrow.left.arrow.right"
         case .budgets:
             return "chart.pie.fill"
         }

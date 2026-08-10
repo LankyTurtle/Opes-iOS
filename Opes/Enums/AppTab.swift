@@ -27,12 +27,14 @@ enum AppTab: String, CaseIterable, Hashable {
         UIImage(systemName: self.icon)
     }
 
-    /// Builds the tab's navigation stack, titled and configured from the tab itself
-    /// so no screen has to describe how it is presented.
+    /// Builds the tab's navigation stack, titled from the tab itself so no screen
+    /// has to name itself.
+    ///
+    /// The bar's own large title isn't used — `TabRootViewController` draws the
+    /// title in its content instead — but the title is still set here so pushed
+    /// screens show the right one in the bar.
     func makeNavigationController() -> UINavigationController {
-        let navigationController = UINavigationController(rootViewController: self.makeDestination())
-        navigationController.navigationBar.prefersLargeTitles = true
-        return navigationController
+        UINavigationController(rootViewController: self.makeDestination())
     }
 
     private func makeDestination() -> UIViewController {
@@ -50,7 +52,6 @@ enum AppTab: String, CaseIterable, Hashable {
         }
 
         destination.title = self.title
-        destination.navigationItem.largeTitleDisplayMode = .always
 
         return destination
     }

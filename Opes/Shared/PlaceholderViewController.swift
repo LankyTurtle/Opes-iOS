@@ -1,7 +1,7 @@
 import UIKit
 
 /// Shows a single centred label while a feature is still scaffolding.
-class PlaceholderViewController: UIViewController {
+class PlaceholderViewController: TabRootViewController {
     /// Overridden by each feature to supply its placeholder copy.
     var placeholderText: String {
         ""
@@ -10,7 +10,7 @@ class PlaceholderViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.view.backgroundColor = .systemBackground
+        self.view.addSubview(self.titleLabel)
 
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -21,7 +21,16 @@ class PlaceholderViewController: UIViewController {
         label.text = self.placeholderText
         self.view.addSubview(label)
 
+        let marginsGuide = self.view.layoutMarginsGuide
+
         NSLayoutConstraint.activate([
+            self.titleLabel.topAnchor.constraint(
+                equalTo: self.view.safeAreaLayoutGuide.topAnchor,
+                constant: 8
+            ),
+            self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
+            self.titleLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
+
             label.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
             label.centerYAnchor.constraint(equalTo: self.view.centerYAnchor),
         ])

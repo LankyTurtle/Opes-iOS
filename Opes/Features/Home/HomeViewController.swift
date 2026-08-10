@@ -3,7 +3,15 @@ import UIKit
 final class HomeViewController: TabRootViewController {
     private let scrollView = UIScrollView()
     private let contentColumn = UIStackView()
-    private let contentRow = UIStackView()
+    private let balanceTile = AvailableBalanceTileView()
+
+    private let accounts = AccountPreview.sample
+
+    /// Defaults to the accounts holding money — debt would otherwise read as an
+    /// "available balance" of hundreds of thousands in the negative.
+    private lazy var selectedAccountIDs: Set<AccountPreview.ID> = Set(
+        self.accounts.filter { $0.balance > 0 }.map(\.id)
+    )
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -13,23 +21,24 @@ final class HomeViewController: TabRootViewController {
 
         self.contentColumn.translatesAutoresizingMaskIntoConstraints = false
         self.contentColumn.axis = .vertical
-        self.contentColumn.spacing = 8
+        self.contentColumn.spacing = 16
         self.contentColumn.isLayoutMarginsRelativeArrangement = true
         self.contentColumn.directionalLayoutMargins.top = 8
+        self.contentColumn.directionalLayoutMargins.bottom = 16
         self.scrollView.addSubview(self.contentColumn)
 
-        self.contentRow.axis = .horizontal
-        self.contentRow.alignment = .center
-        self.contentRow.spacing = 8
-
-        self.contentRow.addArrangedSubview(Self.makeLabel(text: "Text 1"))
-        self.contentRow.addArrangedSubview(Self.makeLabel(text: "Text 2"))
-        self.contentRow.addArrangedSubview(Self.makeSpacer())
-        self.contentRow.addArrangedSubview(Self.makeLabel(text: "Text 3"))
+        self.balanceTile.addTarget(
+            self,
+            action: #selector(self.handleBalanceTileTap),
+            for: .touchUpInside
+        )
 
         // The title scrolls away with the content rather than staying pinned.
         self.contentColumn.addArrangedSubview(self.titleLabel)
-        self.contentColumn.addArrangedSubview(self.contentRow)
+        self.contentColumn.addArrangedSubview(self.balanceTile)
+        self.contentColumn.addArrangedSubview(
+            RecentTransactionsTileView(transactions: Self.recentTransactions())
+        )
 
         let contentLayoutGuide = self.scrollView.contentLayoutGuide
         let frameLayoutGuide = self.scrollView.frameLayoutGuide
@@ -46,6 +55,8 @@ final class HomeViewController: TabRootViewController {
             self.contentColumn.bottomAnchor.constraint(equalTo: contentLayoutGuide.bottomAnchor),
             self.contentColumn.widthAnchor.constraint(equalTo: frameLayoutGuide.widthAnchor),
         ])
+
+        self.refreshBalanceTile()
     }
 
     /// Keeps the content inset in step with the system's readable margins, which
@@ -57,21 +68,36 @@ final class HomeViewController: TabRootViewController {
         self.contentColumn.directionalLayoutMargins.trailing = self.view.directionalLayoutMargins.trailing
     }
 
-    private static func makeLabel(text: String) -> UILabel {
-        let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .body)
-        label.adjustsFontForContentSizeCategory = true
-        label.text = text
-        label.setContentHuggingPriority(.required, for: .horizontal)
-        label.setContentCompressionResistancePriority(.required, for: .horizontal)
-        return label
+    @objc private func handleBalanceTileTap() {
+        let selection = AccountSelectionViewController(
+            accounts: self.accounts,
+            selectedIDs: self.selectedAccountIDs
+        ) { [weak self] selectedIDs in
+            self?.selectedAccountIDs = selectedIDs
+            self?.refreshBalanceTile()
+        }
+
+        let navigationController = UINavigationController(rootViewController: selection)
+        if let sheet = navigationController.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+
+        self.present(navigationController, animated: true)
     }
 
-    /// Stands in for a SwiftUI `Spacer`: soaks up whatever width the labels leave.
-    private static func makeSpacer() -> UIView {
-        let spacer = UIView()
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        return spacer
+    private func refreshBalanceTile() {
+        let selected = self.accounts.filter { self.selectedAccountIDs.contains($0.id) }
+
+        self.balanceTile.show(
+            balance: selected.reduce(Decimal.zero) { $0 + $1.balance },
+            accountCount: selected.count
+        )
+    }
+
+    /// Sorted rather than trusting the sample data's order, so this still holds
+    /// once transactions come from a real store.
+    private static func recentTransactions() -> [Transaction] {
+        Array(Transaction.sample.sorted { $0.date > $1.date }.prefix(5))
     }
 }

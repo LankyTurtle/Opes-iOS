@@ -27,16 +27,31 @@ enum AppTab: String, CaseIterable, Hashable {
         UIImage(systemName: self.icon)
     }
 
-    func makeDestination() -> UIViewController {
+    /// Builds the tab's navigation stack, titled and configured from the tab itself
+    /// so no screen has to describe how it is presented.
+    func makeNavigationController() -> UINavigationController {
+        let navigationController = UINavigationController(rootViewController: self.makeDestination())
+        navigationController.navigationBar.prefersLargeTitles = true
+        return navigationController
+    }
+
+    private func makeDestination() -> UIViewController {
+        let destination: UIViewController
+
         switch self {
         case .home:
-            return HomeViewController()
+            destination = HomeViewController()
         case .accounts:
-            return AccountsViewController()
+            destination = AccountsViewController()
         case .transactions:
-            return TransactionsViewController()
+            destination = TransactionsViewController()
         case .budgets:
-            return BudgetsViewController()
+            destination = BudgetsViewController()
         }
+
+        destination.title = self.title
+        destination.navigationItem.largeTitleDisplayMode = .always
+
+        return destination
     }
 }

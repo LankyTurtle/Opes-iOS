@@ -10,7 +10,7 @@ final class RootViewController: UITabBarController {
                 image: tab.image,
                 identifier: tab.rawValue
             ) { _ in
-                UINavigationController(rootViewController: tab.makeDestination())
+                tab.makeNavigationController()
             }
         }
     }

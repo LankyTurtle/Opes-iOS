@@ -1,13 +1,13 @@
 # Opes
 
 Opes is a native iOS application for personal budgeting and payments. This
-repository currently contains the SwiftUI application foundation and uses
+repository currently contains the UIKit application foundation and uses
 local sample data only.
 
 ## Requirements
 
 - Xcode 16 or newer
-- iOS 17 or newer
+- iOS 26 or newer
 
 ## Getting started
 
@@ -15,12 +15,12 @@ local sample data only.
 2. Select the `Opes` scheme and an iOS simulator.
 3. Build and run with `Command-R`.
 
-The login screen accepts any valid-looking email address and a password of at
-least six characters. Authentication is simulated locally.
-
 ## Project structure
 
-- `App` contains the app entry point, session state, and root navigation.
-- `Features` contains the login, home, accounts, and profile screens.
-- `Models` contains the local domain models and preview data.
+- `App` contains the app and scene delegates.
+- `Enums` contains the app-wide enumerations, including the tab definitions.
+- `Navigation` contains the root tab bar controller.
+- `Features` contains the home, accounts, transactions, budgets, and profile
+  screens.
+- `Resources` contains the asset catalogue.
 - `Shared` contains reusable presentation components.

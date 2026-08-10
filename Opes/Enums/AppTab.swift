@@ -1,14 +1,10 @@
-import SwiftUI
+import UIKit
 
-enum AppTab: String, CaseIterable, Hashable, Identifiable {
+enum AppTab: String, CaseIterable, Hashable {
     case home
     case accounts
     case transactions
     case budgets
-
-    var id: Self {
-        self
-    }
 
     var title: String {
         self.rawValue.capitalized
@@ -27,17 +23,20 @@ enum AppTab: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    @ViewBuilder
-    var destination: some View {
+    var image: UIImage? {
+        UIImage(systemName: self.icon)
+    }
+
+    func makeDestination() -> UIViewController {
         switch self {
         case .home:
-            HomeView()
+            return HomeViewController()
         case .accounts:
-            AccountsView()
+            return AccountsViewController()
         case .transactions:
-            TransactionsView()
+            return TransactionsViewController()
         case .budgets:
-            BudgetsView()
+            return BudgetsViewController()
         }
     }
 }

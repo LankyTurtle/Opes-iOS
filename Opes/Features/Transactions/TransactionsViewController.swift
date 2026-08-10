@@ -15,11 +15,28 @@ final class TransactionsViewController: TabRootViewController {
     private lazy var dataSource = self.makeDataSource()
 
     private let emptyLabel = UILabel()
+    private let searchControl = UIStackView()
     private let searchBar = UISearchBar()
+    private let closeButton = UIButton(type: .system)
+
+    private var compactSearchCenterConstraint: NSLayoutConstraint!
+    private var compactSearchWidthConstraint: NSLayoutConstraint!
+    private var expandedSearchLeadingConstraint: NSLayoutConstraint!
+    private var expandedSearchTrailingConstraint: NSLayoutConstraint!
+    private var isSearchExpanded = false
 
     /// `UISearchBar` insets its field from its own edges. Cancelling that out lines
     /// the visible pill up with the list cells rather than sitting inside them.
     private static let searchFieldInset: CGFloat = 8
+    private static let compactSearchWidth: CGFloat = 152
+    private static let compactPlaceholder = "Search"
+    private static let expandedPlaceholder = "Search transactions"
+
+    /// The pill has to grow with the placeholder it holds, or "Search" clips at the
+    /// larger accessibility text sizes.
+    private var scaledCompactSearchWidth: CGFloat {
+        UIFontMetrics(forTextStyle: .body).scaledValue(for: Self.compactSearchWidth)
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -44,12 +61,42 @@ final class TransactionsViewController: TabRootViewController {
 
         // Added last so it stays above the list and the empty state — the user has
         // to be able to reach the field to clear a search that matched nothing.
-        self.searchBar.translatesAutoresizingMaskIntoConstraints = false
+        self.searchControl.translatesAutoresizingMaskIntoConstraints = false
+        self.searchControl.axis = .horizontal
+        self.searchControl.alignment = .center
+        self.searchControl.spacing = 4
+        self.view.addSubview(self.searchControl)
+
         self.searchBar.searchBarStyle = .minimal
-        self.searchBar.placeholder = "Search"
+        self.searchBar.placeholder = Self.compactPlaceholder
         self.searchBar.autocorrectionType = .no
         self.searchBar.delegate = self
-        self.view.addSubview(self.searchBar)
+        // The field yields; the close button keeps its size. Without this the search
+        // bar's intrinsic width argues with the compact pill's fixed width.
+        self.searchBar.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        self.searchBar.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        self.searchControl.addArrangedSubview(self.searchBar)
+
+        var closeConfiguration = UIButton.Configuration.plain()
+        closeConfiguration.image = UIImage(systemName: "xmark")
+        closeConfiguration.baseForegroundColor = .secondaryLabel
+        closeConfiguration.contentInsets = NSDirectionalEdgeInsets(
+            top: 14,
+            leading: 14,
+            bottom: 14,
+            trailing: 14
+        )
+        self.closeButton.configuration = closeConfiguration
+        self.closeButton.accessibilityLabel = "Close search"
+        self.closeButton.isHidden = true
+        self.closeButton.setContentHuggingPriority(.required, for: .horizontal)
+        self.closeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        self.closeButton.addTarget(
+            self,
+            action: #selector(self.handleCloseSearch),
+            for: .touchUpInside
+        )
+        self.searchControl.addArrangedSubview(self.closeButton)
 
         let dismissSwipe = UISwipeGestureRecognizer(
             target: self,
@@ -59,6 +106,23 @@ final class TransactionsViewController: TabRootViewController {
         self.searchBar.addGestureRecognizer(dismissSwipe)
 
         let marginsGuide = self.view.layoutMarginsGuide
+
+        self.compactSearchCenterConstraint = self.searchControl.centerXAnchor.constraint(
+            equalTo: self.view.centerXAnchor
+        )
+        self.compactSearchWidthConstraint = self.searchControl.widthAnchor.constraint(
+            equalToConstant: self.scaledCompactSearchWidth
+        )
+        self.expandedSearchLeadingConstraint = self.searchControl.leadingAnchor.constraint(
+            equalTo: marginsGuide.leadingAnchor,
+            constant: -Self.searchFieldInset
+        )
+        // Mirrors the leading inset. The close button's own content insets then sit
+        // its glyph just inside the margin, matching where the field's text starts.
+        self.expandedSearchTrailingConstraint = self.searchControl.trailingAnchor.constraint(
+            equalTo: marginsGuide.trailingAnchor,
+            constant: Self.searchFieldInset
+        )
 
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
@@ -79,30 +143,35 @@ final class TransactionsViewController: TabRootViewController {
             self.emptyLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
             self.emptyLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
 
-            self.searchBar.leadingAnchor.constraint(
-                equalTo: marginsGuide.leadingAnchor,
-                constant: -Self.searchFieldInset
-            ),
-            self.searchBar.trailingAnchor.constraint(
-                equalTo: marginsGuide.trailingAnchor,
-                constant: Self.searchFieldInset
-            ),
+            self.compactSearchCenterConstraint,
+            self.compactSearchWidthConstraint,
             // The keyboard layout guide sits at the safe area bottom — above the tab
             // bar — while the keyboard is down, and rides the keyboard when it's up.
-            self.searchBar.bottomAnchor.constraint(
+            self.searchControl.bottomAnchor.constraint(
                 equalTo: self.view.keyboardLayoutGuide.topAnchor,
                 constant: -8
             ),
         ])
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.handleContentSizeCategoryChange),
+            name: UIContentSizeCategory.didChangeNotification,
+            object: nil
+        )
+
         self.apply(query: "", animated: false)
+    }
+
+    @objc private func handleContentSizeCategoryChange() {
+        self.compactSearchWidthConstraint.constant = self.scaledCompactSearchWidth
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
         // Let the last row clear the floating search field.
-        let bottomInset = self.searchBar.bounds.height + 8
+        let bottomInset = self.searchControl.bounds.height + 8
         if self.collectionView.contentInset.bottom != bottomInset {
             self.collectionView.contentInset.bottom = bottomInset
             self.collectionView.verticalScrollIndicatorInsets.bottom = bottomInset
@@ -113,16 +182,105 @@ final class TransactionsViewController: TabRootViewController {
         self.dismissSearchKeyboard()
     }
 
+    @objc private func handleCloseSearch() {
+        self.searchBar.text = ""
+        self.apply(query: "", animated: true)
+        self.searchBar.searchTextField.resignFirstResponder()
+        self.setSearchExpanded(false, animated: true)
+    }
+
     /// The single close path — swipe, Search key, and scrolling all land here, so the
     /// keyboard never goes away without the search bar animating back down with it.
     /// The query is deliberately kept; only the keyboard is dismissed.
     private func dismissSearchKeyboard() {
-        guard self.searchBar.isFirstResponder else {
+        guard self.searchBar.searchTextField.isFirstResponder else {
+            self.collapseSearchIfEmpty()
             return
         }
 
-        self.searchBar.resignFirstResponder()
-        self.animateSearchBarToRest()
+        self.searchBar.searchTextField.resignFirstResponder()
+
+        // Collapsing already animates the whole layout, so the rest animation would
+        // be a second spring retargeting the same constraints on a different curve.
+        // Calling this here rather than trusting `searchBarTextDidEndEditing` also
+        // means the collapse doesn't hinge on the search bar forwarding its text
+        // field's end-editing callback; the call is idempotent either way.
+        if !self.collapseSearchIfEmpty() {
+            self.animateSearchBarToRest()
+        }
+    }
+
+    /// Returns whether the search is collapsed — true when the query is empty, even
+    /// if it was already collapsed — so callers know an animation is under way.
+    @discardableResult
+    private func collapseSearchIfEmpty() -> Bool {
+        let query = self.searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard query.isEmpty else {
+            return false
+        }
+
+        self.setSearchExpanded(false, animated: true)
+        return true
+    }
+
+    private func setSearchExpanded(_ expanded: Bool, animated: Bool) {
+        guard self.isSearchExpanded != expanded else {
+            return
+        }
+
+        self.view.layoutIfNeeded()
+        self.isSearchExpanded = expanded
+
+        if expanded {
+            NSLayoutConstraint.deactivate([
+                self.compactSearchCenterConstraint,
+                self.compactSearchWidthConstraint,
+            ])
+            NSLayoutConstraint.activate([
+                self.expandedSearchLeadingConstraint,
+                self.expandedSearchTrailingConstraint,
+            ])
+        } else {
+            // Shorten the placeholder before the pill shrinks around it, so the long
+            // string is never rendered into a field too narrow to hold it.
+            self.searchBar.placeholder = Self.compactPlaceholder
+            NSLayoutConstraint.deactivate([
+                self.expandedSearchLeadingConstraint,
+                self.expandedSearchTrailingConstraint,
+            ])
+            NSLayoutConstraint.activate([
+                self.compactSearchCenterConstraint,
+                self.compactSearchWidthConstraint,
+            ])
+        }
+        self.closeButton.isHidden = !expanded
+
+        // Conversely, the long placeholder waits until there's room for it.
+        let finish = {
+            if expanded {
+                self.searchBar.placeholder = Self.expandedPlaceholder
+            }
+        }
+
+        guard animated else {
+            self.view.layoutIfNeeded()
+            finish()
+            return
+        }
+
+        UIView.animate(
+            withDuration: 0.35,
+            delay: 0,
+            usingSpringWithDamping: 0.86,
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction],
+            animations: {
+                self.view.layoutIfNeeded()
+            },
+            completion: { _ in
+                finish()
+            }
+        )
     }
 
     /// The keyboard layout guide already drives the search bar back down, but it
@@ -184,12 +342,24 @@ final class TransactionsViewController: TabRootViewController {
 }
 
 extension TransactionsViewController: UISearchBarDelegate {
+    func searchBarShouldBeginEditing(_ searchBar: UISearchBar) -> Bool {
+        self.setSearchExpanded(true, animated: true)
+        return true
+    }
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if !searchText.isEmpty {
+            self.setSearchExpanded(true, animated: true)
+        }
         self.apply(query: searchText, animated: true)
     }
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         self.dismissSearchKeyboard()
+    }
+
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
+        self.collapseSearchIfEmpty()
     }
 }
 

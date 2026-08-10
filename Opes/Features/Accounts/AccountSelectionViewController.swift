@@ -48,6 +48,9 @@ final class AccountSelectionViewController: UIViewController {
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
         self.collectionView.delegate = self
+        // Keeps the list draggable at either detent even when the accounts don't
+        // fill the sheet, so it never reads as a fixed pane.
+        self.collectionView.alwaysBounceVertical = true
         self.view.addSubview(self.collectionView)
 
         NSLayoutConstraint.activate([

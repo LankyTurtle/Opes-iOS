@@ -2,6 +2,9 @@ import UIKit
 
 /// Home's balance summary. Tapping it chooses which accounts feed the total.
 final class AvailableBalanceTileView: UIControl {
+    /// Leading half of the header, ahead of the account count.
+    var headerTitle = "Available Balance"
+
     private let headerLabel = UILabel()
     private let balanceLabel = UILabel()
     private let disclosureView = UIImageView()
@@ -71,10 +74,10 @@ final class AvailableBalanceTileView: UIControl {
         let accountsDescription = accountCount == 1 ? "1 account" : "\(accountCount) accounts"
         let formattedBalance = balance.formatted(.currency(code: "AUD"))
 
-        self.headerLabel.text = "Available Balance (\(accountsDescription))"
+        self.headerLabel.text = "\(self.headerTitle) (\(accountsDescription))"
         self.balanceLabel.text = formattedBalance
 
-        self.accessibilityLabel = "Available balance, \(formattedBalance), from \(accountsDescription)"
+        self.accessibilityLabel = "\(self.headerTitle), \(formattedBalance), from \(accountsDescription)"
         self.accessibilityHint = "Choose which accounts to include"
     }
 }

@@ -28,7 +28,9 @@ final class TransactionsViewController: TabRootViewController {
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
-        self.collectionView.keyboardDismissMode = .onDrag
+        // Dismissal is driven from `scrollViewWillBeginDragging` rather than by
+        // `keyboardDismissMode`, so scrolling animates the close like every other route.
+        self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
 
         self.emptyLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -107,13 +109,20 @@ final class TransactionsViewController: TabRootViewController {
         }
     }
 
-    /// Swiping down the search bar puts the keyboard away without losing the query.
     @objc private func handleDismissSwipe() {
+        self.dismissSearchKeyboard()
+    }
+
+    /// The single close path — swipe, Search key, and scrolling all land here, so the
+    /// keyboard never goes away without the search bar animating back down with it.
+    /// The query is deliberately kept; only the keyboard is dismissed.
+    private func dismissSearchKeyboard() {
         guard self.searchBar.isFirstResponder else {
             return
         }
 
         self.searchBar.resignFirstResponder()
+        self.animateSearchBarToRest()
     }
 
     /// The keyboard layout guide already drives the search bar back down, but it
@@ -180,12 +189,12 @@ extension TransactionsViewController: UISearchBarDelegate {
     }
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        searchBar.resignFirstResponder()
+        self.dismissSearchKeyboard()
     }
+}
 
-    /// Fires however the field was dismissed — swipe, Search key, or dragging the
-    /// list — so the close animates from every route.
-    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
-        self.animateSearchBarToRest()
+extension TransactionsViewController: UICollectionViewDelegate {
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        self.dismissSearchKeyboard()
     }
 }

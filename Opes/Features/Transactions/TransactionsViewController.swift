@@ -15,10 +15,11 @@ final class TransactionsViewController: TabRootViewController {
     private lazy var dataSource = self.makeDataSource()
 
     private let emptyLabel = UILabel()
-    private let searchBackground = UIVisualEffectView(
-        effect: UIBlurEffect(style: .systemChromeMaterial)
-    )
     private let searchBar = UISearchBar()
+
+    /// `UISearchBar` insets its field from its own edges. Cancelling that out lines
+    /// the visible pill up with the list cells rather than sitting inside them.
+    private static let searchFieldInset: CGFloat = 8
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -41,22 +42,14 @@ final class TransactionsViewController: TabRootViewController {
 
         // Added last so it stays above the list and the empty state — the user has
         // to be able to reach the field to clear a search that matched nothing.
-        self.searchBackground.translatesAutoresizingMaskIntoConstraints = false
-        self.searchBackground.clipsToBounds = true
-        self.searchBackground.layer.cornerCurve = .continuous
-        self.view.addSubview(self.searchBackground)
-
         self.searchBar.translatesAutoresizingMaskIntoConstraints = false
         self.searchBar.searchBarStyle = .minimal
-        self.searchBar.placeholder = "Search transactions"
+        self.searchBar.placeholder = "Search"
         self.searchBar.autocorrectionType = .no
         self.searchBar.delegate = self
-        // The blur capsule is the field's background, so drop the search bar's own.
-        self.searchBar.searchTextField.backgroundColor = .clear
-        self.searchBackground.contentView.addSubview(self.searchBar)
+        self.view.addSubview(self.searchBar)
 
         let marginsGuide = self.view.layoutMarginsGuide
-        let searchContent = self.searchBackground.contentView
 
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
@@ -77,19 +70,20 @@ final class TransactionsViewController: TabRootViewController {
             self.emptyLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
             self.emptyLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
 
-            self.searchBackground.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
-            self.searchBackground.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
+            self.searchBar.leadingAnchor.constraint(
+                equalTo: marginsGuide.leadingAnchor,
+                constant: -Self.searchFieldInset
+            ),
+            self.searchBar.trailingAnchor.constraint(
+                equalTo: marginsGuide.trailingAnchor,
+                constant: Self.searchFieldInset
+            ),
             // The keyboard layout guide sits at the safe area bottom — above the tab
             // bar — while the keyboard is down, and rides the keyboard when it's up.
-            self.searchBackground.bottomAnchor.constraint(
+            self.searchBar.bottomAnchor.constraint(
                 equalTo: self.view.keyboardLayoutGuide.topAnchor,
                 constant: -8
             ),
-
-            self.searchBar.topAnchor.constraint(equalTo: searchContent.topAnchor),
-            self.searchBar.leadingAnchor.constraint(equalTo: searchContent.leadingAnchor),
-            self.searchBar.trailingAnchor.constraint(equalTo: searchContent.trailingAnchor),
-            self.searchBar.bottomAnchor.constraint(equalTo: searchContent.bottomAnchor),
         ])
 
         self.apply(query: "", animated: false)
@@ -98,11 +92,8 @@ final class TransactionsViewController: TabRootViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
-        let searchHeight = self.searchBackground.bounds.height
-        self.searchBackground.layer.cornerRadius = searchHeight / 2
-
         // Let the last row clear the floating search field.
-        let bottomInset = searchHeight + 16
+        let bottomInset = self.searchBar.bounds.height + 8
         if self.collectionView.contentInset.bottom != bottomInset {
             self.collectionView.contentInset.bottom = bottomInset
             self.collectionView.verticalScrollIndicatorInsets.bottom = bottomInset

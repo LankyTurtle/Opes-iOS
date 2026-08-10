@@ -49,6 +49,13 @@ final class TransactionsViewController: TabRootViewController {
         self.searchBar.delegate = self
         self.view.addSubview(self.searchBar)
 
+        let dismissSwipe = UISwipeGestureRecognizer(
+            target: self,
+            action: #selector(self.handleDismissSwipe)
+        )
+        dismissSwipe.direction = .down
+        self.searchBar.addGestureRecognizer(dismissSwipe)
+
         let marginsGuide = self.view.layoutMarginsGuide
 
         NSLayoutConstraint.activate([
@@ -100,6 +107,32 @@ final class TransactionsViewController: TabRootViewController {
         }
     }
 
+    /// Swiping down the search bar puts the keyboard away without losing the query.
+    @objc private func handleDismissSwipe() {
+        guard self.searchBar.isFirstResponder else {
+            return
+        }
+
+        self.searchBar.resignFirstResponder()
+    }
+
+    /// The keyboard layout guide already drives the search bar back down, but it
+    /// follows the keyboard's own curve. Retargeting it as a spring — from wherever
+    /// it currently is — gives the close a bit of settle instead of a flat slide.
+    private func animateSearchBarToRest() {
+        self.view.setNeedsLayout()
+
+        UIView.animate(
+            withDuration: 0.4,
+            delay: 0,
+            usingSpringWithDamping: 0.8,
+            initialSpringVelocity: 0.5,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
     private func apply(query: String, animated: Bool) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = trimmed.isEmpty
@@ -148,5 +181,11 @@ extension TransactionsViewController: UISearchBarDelegate {
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+    }
+
+    /// Fires however the field was dismissed — swipe, Search key, or dragging the
+    /// list — so the close animates from every route.
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
+        self.animateSearchBarToRest()
     }
 }

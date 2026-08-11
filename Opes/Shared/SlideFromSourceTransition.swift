@@ -8,12 +8,25 @@ import UIKit
 /// drag-to-resize/dismiss are traded away for the entrance animation. Height is
 /// fixed at presentation time instead of being a detent the user can drag between.
 final class SlideFromSourceTransition: NSObject {
-    private weak var sourceView: UIView?
-    private let heightFraction: CGFloat
+    /// How tall the card sits.
+    enum CardHeight {
+        /// Tracks the system sheet's large detent — full height less a top inset —
+        /// rather than a fraction, so it lands in the same place on any device.
+        case matchingLargeDetent
+        /// A fraction of the container height, for the shorter card.
+        case fraction(CGFloat)
+    }
 
-    init(sourceView: UIView, heightFraction: CGFloat) {
+    /// Shared with the native sheet's `preferredCornerRadius`, so the two
+    /// presentations round their corners identically instead of both guessing.
+    static let cardCornerRadius: CGFloat = 20
+
+    private weak var sourceView: UIView?
+    private let height: CardHeight
+
+    init(sourceView: UIView, height: CardHeight) {
         self.sourceView = sourceView
-        self.heightFraction = heightFraction
+        self.height = height
         super.init()
     }
 }
@@ -27,7 +40,7 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
         SlideFromSourcePresentationController(
             presentedViewController: presented,
             presenting: presenting,
-            heightFraction: self.heightFraction
+            height: self.height
         )
     }
 
@@ -48,15 +61,19 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
 
 /// Lays the card out along the bottom edge behind a dimmed backdrop.
 final class SlideFromSourcePresentationController: UIPresentationController {
-    private let heightFraction: CGFloat
+    /// Gap between the top safe area and the card, measured off the system sheet's
+    /// large detent. Adjust here if the two tops don't line up.
+    private static let largeDetentTopInset: CGFloat = 4
+
+    private let height: SlideFromSourceTransition.CardHeight
     private let dimmingView = UIView()
 
     init(
         presentedViewController: UIViewController,
         presenting presentingViewController: UIViewController?,
-        heightFraction: CGFloat
+        height: SlideFromSourceTransition.CardHeight
     ) {
-        self.heightFraction = heightFraction
+        self.height = height
         super.init(
             presentedViewController: presentedViewController,
             presenting: presentingViewController
@@ -68,13 +85,17 @@ final class SlideFromSourcePresentationController: UIPresentationController {
             return .zero
         }
 
-        let height = (containerView.bounds.height * self.heightFraction).rounded()
-        return CGRect(
-            x: 0,
-            y: containerView.bounds.height - height,
-            width: containerView.bounds.width,
-            height: height
-        )
+        let bounds = containerView.bounds
+        let top: CGFloat
+
+        switch self.height {
+        case .matchingLargeDetent:
+            top = containerView.safeAreaInsets.top + Self.largeDetentTopInset
+        case .fraction(let fraction):
+            top = bounds.height - (bounds.height * fraction).rounded()
+        }
+
+        return CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
     }
 
     override func presentationTransitionWillBegin() {
@@ -94,7 +115,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         containerView.addSubview(self.dimmingView)
 
         if let presentedView = self.presentedView {
-            presentedView.layer.cornerRadius = 16
+            presentedView.layer.cornerRadius = SlideFromSourceTransition.cardCornerRadius
             presentedView.layer.cornerCurve = .continuous
             presentedView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             presentedView.clipsToBounds = true

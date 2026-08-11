@@ -11,7 +11,6 @@ final class HomeViewController: TabRootViewController {
     /// Up to this many accounts, the selection card opens at the shorter height.
     private static let mediumSheetAccountLimit = 5
     private static let shortCardHeightFraction: CGFloat = 0.5
-    private static let tallCardHeightFraction: CGFloat = 0.92
 
     private var accountSelectionTransition: SlideFromSourceTransition?
 
@@ -103,6 +102,9 @@ final class HomeViewController: TabRootViewController {
             // full height instead of scrolling it. The grabber still expands it.
             sheet.prefersScrollingExpandsWhenScrolledToEdge = false
             sheet.prefersGrabberVisible = true
+            // Pinned rather than left to the system default, so the custom card can
+            // be given the same value instead of guessing at what the default is.
+            sheet.preferredCornerRadius = SlideFromSourceTransition.cardCornerRadius
         }
 
         navigationController.preferredTransition = .zoom { [weak self] _ in
@@ -119,9 +121,9 @@ final class HomeViewController: TabRootViewController {
 
         let transition = SlideFromSourceTransition(
             sourceView: self.customTile,
-            heightFraction: self.accounts.count > Self.mediumSheetAccountLimit
-                ? Self.tallCardHeightFraction
-                : Self.shortCardHeightFraction
+            height: self.accounts.count > Self.mediumSheetAccountLimit
+                ? .matchingLargeDetent
+                : .fraction(Self.shortCardHeightFraction)
         )
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition

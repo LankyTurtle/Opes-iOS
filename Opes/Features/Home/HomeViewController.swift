@@ -43,6 +43,12 @@ final class HomeViewController: TabRootViewController {
             withConfiguration: UIImage.SymbolConfiguration(textStyle: .body)
         )
         self.customiseButton.configuration = customiseConfiguration
+        // Tint only while held, so the glass frosts in the accent instead of white
+        // and the resting state is left alone. `.tintColor` resolves to the accent
+        // rather than naming the colour a second time.
+        self.customiseButton.configurationUpdateHandler = { button in
+            button.configuration?.baseBackgroundColor = button.isHighlighted ? .tintColor : nil
+        }
         self.customiseButton.translatesAutoresizingMaskIntoConstraints = false
         self.customiseButton.accessibilityLabel = "Customise Home"
         self.customiseButton.setContentHuggingPriority(.required, for: .horizontal)

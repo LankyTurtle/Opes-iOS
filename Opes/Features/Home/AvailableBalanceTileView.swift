@@ -13,9 +13,8 @@ final class AvailableBalanceTileView: UIControl {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        self.backgroundColor = .secondarySystemGroupedBackground
-        self.layer.cornerRadius = 12
-        self.layer.cornerCurve = .continuous
+        // The list cell draws the card background and corners at the system radius.
+        self.backgroundColor = .clear
 
         self.headerLabel.translatesAutoresizingMaskIntoConstraints = false
         self.headerLabel.font = .preferredFont(forTextStyle: .headline)

@@ -18,9 +18,8 @@ final class AvailableBalanceTileView: UIControl {
         self.layer.cornerCurve = .continuous
 
         self.headerLabel.translatesAutoresizingMaskIntoConstraints = false
-        self.headerLabel.font = .preferredFont(forTextStyle: .subheadline)
+        self.headerLabel.font = .preferredFont(forTextStyle: .headline)
         self.headerLabel.adjustsFontForContentSizeCategory = true
-        self.headerLabel.textColor = .secondaryLabel
         self.headerLabel.numberOfLines = 0
         self.addSubview(self.headerLabel)
 

@@ -34,7 +34,14 @@ final class HomeViewController: TabRootViewController {
         self.view.addSubview(self.titleLabel)
 
         var customiseConfiguration = UIButton.Configuration.plain()
-        customiseConfiguration.image = UIImage(systemName: "ellipsis.circle")
+        // Bar buttons draw their symbol at body-large, and their padding comes from
+        // the bar rather than the button — so the glyph is sized here and the tap
+        // target comes from the minimum box below.
+        customiseConfiguration.image = UIImage(
+            systemName: "ellipsis.circle",
+            withConfiguration: UIImage.SymbolConfiguration(textStyle: .body, scale: .large)
+        )
+        customiseConfiguration.contentInsets = .zero
         self.customiseButton.configuration = customiseConfiguration
         self.customiseButton.translatesAutoresizingMaskIntoConstraints = false
         self.customiseButton.accessibilityLabel = "Customise Home"
@@ -82,6 +89,10 @@ final class HomeViewController: TabRootViewController {
 
             self.customiseButton.centerYAnchor.constraint(equalTo: self.titleLabel.centerYAnchor),
             self.customiseButton.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
+            // Minimum rather than fixed, so the box still grows with the glyph at the
+            // accessibility text sizes.
+            self.customiseButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            self.customiseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
 
             self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: 8),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),

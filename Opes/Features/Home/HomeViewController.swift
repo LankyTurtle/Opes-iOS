@@ -76,6 +76,14 @@ final class HomeViewController: TabRootViewController {
 
         let marginsGuide = self.view.layoutMarginsGuide
 
+        // Glass buttons grow past their own bounds while pressed. Centring on the
+        // title puts that expanded circle over the safe area edge, where it gets
+        // clipped — so the centring yields to a minimum clearance from the top.
+        let customiseButtonCentre = self.customiseButton.centerYAnchor.constraint(
+            equalTo: self.titleLabel.centerYAnchor
+        )
+        customiseButtonCentre.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
                 equalTo: self.view.safeAreaLayoutGuide.topAnchor,
@@ -87,7 +95,11 @@ final class HomeViewController: TabRootViewController {
                 constant: -8
             ),
 
-            self.customiseButton.centerYAnchor.constraint(equalTo: self.titleLabel.centerYAnchor),
+            customiseButtonCentre,
+            self.customiseButton.topAnchor.constraint(
+                greaterThanOrEqualTo: self.view.safeAreaLayoutGuide.topAnchor,
+                constant: 12
+            ),
             self.customiseButton.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
             // Minimum rather than fixed, so the box still grows with the glyph at the
             // accessibility text sizes.

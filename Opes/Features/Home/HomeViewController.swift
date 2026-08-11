@@ -33,15 +33,15 @@ final class HomeViewController: TabRootViewController {
 
         self.view.addSubview(self.titleLabel)
 
-        var customiseConfiguration = UIButton.Configuration.plain()
-        // Bar buttons draw their symbol at body-large, and their padding comes from
-        // the bar rather than the button — so the glyph is sized here and the tap
-        // target comes from the minimum box below.
+        // A nav bar button on iOS 26 is a glass container with a body-sized symbol
+        // inside it, not a bare glyph — which is why sizing the symbol alone never
+        // matched. The container draws the circle, so the symbol is the plain
+        // ellipsis rather than the encircled one.
+        var customiseConfiguration = UIButton.Configuration.glass()
         customiseConfiguration.image = UIImage(
-            systemName: "ellipsis.circle",
-            withConfiguration: UIImage.SymbolConfiguration(textStyle: .body, scale: .large)
+            systemName: "ellipsis",
+            withConfiguration: UIImage.SymbolConfiguration(textStyle: .body)
         )
-        customiseConfiguration.contentInsets = .zero
         self.customiseButton.configuration = customiseConfiguration
         self.customiseButton.translatesAutoresizingMaskIntoConstraints = false
         self.customiseButton.accessibilityLabel = "Customise Home"

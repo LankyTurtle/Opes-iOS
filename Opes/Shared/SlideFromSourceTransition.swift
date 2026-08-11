@@ -8,25 +8,15 @@ import UIKit
 /// drag-to-resize/dismiss are traded away for the entrance animation. Height is
 /// fixed at presentation time instead of being a detent the user can drag between.
 final class SlideFromSourceTransition: NSObject {
-    /// How tall the card sits.
-    enum CardHeight {
-        /// Tracks the system sheet's large detent — full height less a top inset —
-        /// rather than a fraction, so it lands in the same place on any device.
-        case matchingLargeDetent
-        /// A fraction of the container height, for the shorter card.
-        case fraction(CGFloat)
-    }
-
-    /// Shared with the native sheet's `preferredCornerRadius`, so the two
-    /// presentations round their corners identically instead of both guessing.
+    /// Approximates the system sheet's own corner radius, measured off a screenshot
+    /// — there's no public API to read it, and the native sheet is now left on its
+    /// default rather than pinned to this value.
     static let cardCornerRadius: CGFloat = 20
 
     private weak var sourceView: UIView?
-    private let height: CardHeight
 
-    init(sourceView: UIView, height: CardHeight) {
+    init(sourceView: UIView) {
         self.sourceView = sourceView
-        self.height = height
         super.init()
     }
 }
@@ -39,8 +29,7 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
     ) -> UIPresentationController? {
         SlideFromSourcePresentationController(
             presentedViewController: presented,
-            presenting: presenting,
-            height: self.height
+            presenting: presenting
         )
     }
 
@@ -65,20 +54,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
     /// large detent. Adjust here if the two tops don't line up.
     private static let largeDetentTopInset: CGFloat = 4
 
-    private let height: SlideFromSourceTransition.CardHeight
     private let dimmingView = UIView()
-
-    init(
-        presentedViewController: UIViewController,
-        presenting presentingViewController: UIViewController?,
-        height: SlideFromSourceTransition.CardHeight
-    ) {
-        self.height = height
-        super.init(
-            presentedViewController: presentedViewController,
-            presenting: presentingViewController
-        )
-    }
 
     override var frameOfPresentedViewInContainerView: CGRect {
         guard let containerView = self.containerView else {
@@ -86,14 +62,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         }
 
         let bounds = containerView.bounds
-        let top: CGFloat
-
-        switch self.height {
-        case .matchingLargeDetent:
-            top = containerView.safeAreaInsets.top + Self.largeDetentTopInset
-        case .fraction(let fraction):
-            top = bounds.height - (bounds.height * fraction).rounded()
-        }
+        let top = containerView.safeAreaInsets.top + Self.largeDetentTopInset
 
         return CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
     }

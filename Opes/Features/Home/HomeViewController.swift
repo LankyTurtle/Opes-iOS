@@ -8,10 +8,6 @@ final class HomeViewController: TabRootViewController {
 
     private let accounts = AccountPreview.sample
 
-    /// Up to this many accounts, the selection card opens at the shorter height.
-    private static let mediumSheetAccountLimit = 5
-    private static let shortCardHeightFraction: CGFloat = 0.5
-
     private var accountSelectionTransition: SlideFromSourceTransition?
 
     /// Defaults to the accounts holding money — debt would otherwise read as an
@@ -85,26 +81,15 @@ final class HomeViewController: TabRootViewController {
         self.contentColumn.directionalLayoutMargins.trailing = self.view.directionalLayoutMargins.trailing
     }
 
-    /// Native sheet: real detents, grabber and drag-to-dismiss, with the zoom
-    /// transition growing out of the tile.
+    /// Native sheet: grabber and drag-to-dismiss, with the zoom transition growing
+    /// out of the tile.
     @objc private func handleBalanceTileTap() {
         let navigationController = self.makeAccountSelectionController()
         navigationController.modalPresentationStyle = .pageSheet
 
         if let sheet = navigationController.sheetPresentationController {
-            // A long list needs the height to be usable; a short one shouldn't take
-            // over the screen to show a handful of rows.
-            sheet.detents = [.medium(), .large()]
-            sheet.selectedDetentIdentifier = self.accounts.count > Self.mediumSheetAccountLimit
-                ? .large
-                : .medium
-            // Otherwise dragging the list at the medium detent grows the sheet to
-            // full height instead of scrolling it. The grabber still expands it.
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+            sheet.detents = [.large()]
             sheet.prefersGrabberVisible = true
-            // Pinned rather than left to the system default, so the custom card can
-            // be given the same value instead of guessing at what the default is.
-            sheet.preferredCornerRadius = SlideFromSourceTransition.cardCornerRadius
         }
 
         navigationController.preferredTransition = .zoom { [weak self] _ in
@@ -119,12 +104,7 @@ final class HomeViewController: TabRootViewController {
     @objc private func handleCustomTileTap() {
         let navigationController = self.makeAccountSelectionController()
 
-        let transition = SlideFromSourceTransition(
-            sourceView: self.customTile,
-            height: self.accounts.count > Self.mediumSheetAccountLimit
-                ? .matchingLargeDetent
-                : .fraction(Self.shortCardHeightFraction)
-        )
+        let transition = SlideFromSourceTransition(sourceView: self.customTile)
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 

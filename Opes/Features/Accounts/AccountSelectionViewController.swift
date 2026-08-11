@@ -37,7 +37,7 @@ final class AccountSelectionViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.title = "Include Accounts"
+        self.title = "Select Accounts"
         self.view.backgroundColor = .systemGroupedBackground
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .done,

@@ -102,9 +102,12 @@ final class HomeViewController: TabRootViewController {
             ),
             self.customiseButton.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
             // Minimum rather than fixed, so the box still grows with the glyph at the
-            // accessibility text sizes.
+            // accessibility text sizes. Square, because a glass button's intrinsic
+            // height exceeds that minimum while the width rests on it, which draws
+            // the container as an upright capsule rather than a circle.
             self.customiseButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
             self.customiseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            self.customiseButton.widthAnchor.constraint(equalTo: self.customiseButton.heightAnchor),
 
             self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: 8),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),

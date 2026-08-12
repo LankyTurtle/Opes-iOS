@@ -34,7 +34,9 @@ enum AppTab: String, CaseIterable, Hashable {
     /// title in its content instead — but the title is still set here so pushed
     /// screens show the right one in the bar.
     func makeNavigationController() -> UINavigationController {
-        UINavigationController(rootViewController: self.makeDestination())
+        let navigationController = UINavigationController(rootViewController: self.makeDestination())
+        navigationController.navigationBar.prefersLargeTitles = true
+        return navigationController
     }
 
     private func makeDestination() -> UIViewController {

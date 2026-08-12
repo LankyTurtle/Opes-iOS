@@ -10,8 +10,6 @@ class PlaceholderViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.view.addSubview(self.titleLabel)
-
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .preferredFont(forTextStyle: .body)
@@ -21,16 +19,7 @@ class PlaceholderViewController: TabRootViewController {
         label.text = self.placeholderText
         self.view.addSubview(label)
 
-        let marginsGuide = self.view.layoutMarginsGuide
-
         NSLayoutConstraint.activate([
-            self.titleLabel.topAnchor.constraint(
-                equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: DesignTokens.titleTopInset
-            ),
-            self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
-            self.titleLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
-
             label.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
             label.centerYAnchor.constraint(equalTo: self.view.centerYAnchor),
         ])

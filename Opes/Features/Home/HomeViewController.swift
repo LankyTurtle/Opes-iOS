@@ -1,8 +1,6 @@
 import UIKit
 
 final class HomeViewController: TabRootViewController {
-    private let customiseButton = UIButton(type: .system)
-
     private lazy var collectionView = UICollectionView(
         frame: .zero,
         collectionViewLayout: Self.makeLayout()
@@ -32,34 +30,16 @@ final class HomeViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.view.addSubview(self.titleLabel)
-
-        // A nav bar button on iOS 26 is a glass container with a body-sized symbol
-        // inside it, not a bare glyph — which is why sizing the symbol alone never
-        // matched. The container draws the circle, so the symbol is the plain
-        // ellipsis rather than the encircled one.
-        var customiseConfiguration = UIButton.Configuration.glass()
-        customiseConfiguration.image = UIImage(
-            systemName: "ellipsis",
-            withConfiguration: UIImage.SymbolConfiguration(textStyle: .body)
+        // A real bar button item, so the bar supplies its material, metrics and
+        // press behaviour rather than this screen reproducing them.
+        let customiseItem = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis"),
+            style: .plain,
+            target: self,
+            action: #selector(self.handleCustomiseTap)
         )
-        self.customiseButton.configuration = customiseConfiguration
-        // Tint only while held, so the glass frosts in the accent instead of white
-        // and the resting state is left alone. Named outright rather than resolved
-        // through `.tintColor`, which didn't take inside the configuration.
-        self.customiseButton.configurationUpdateHandler = { button in
-            button.configuration?.baseBackgroundColor = button.isHighlighted ? .systemTeal : nil
-        }
-        self.customiseButton.translatesAutoresizingMaskIntoConstraints = false
-        self.customiseButton.accessibilityLabel = "Customise Home"
-        self.customiseButton.setContentHuggingPriority(.required, for: .horizontal)
-        self.customiseButton.setContentCompressionResistancePriority(.required, for: .horizontal)
-        self.customiseButton.addTarget(
-            self,
-            action: #selector(self.handleCustomiseTap),
-            for: .touchUpInside
-        )
-        self.view.addSubview(self.customiseButton)
+        customiseItem.accessibilityLabel = "Customise Home"
+        self.navigationItem.rightBarButtonItem = customiseItem
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -81,42 +61,8 @@ final class HomeViewController: TabRootViewController {
             for: .touchUpInside
         )
 
-        let marginsGuide = self.view.layoutMarginsGuide
-
-        // Glass buttons grow past their own bounds while pressed. Centring on the
-        // title puts that expanded circle over the safe area edge, where it gets
-        // clipped — so the centring yields to a minimum clearance from the top.
-        let customiseButtonCentre = self.customiseButton.centerYAnchor.constraint(
-            equalTo: self.titleLabel.centerYAnchor
-        )
-        customiseButtonCentre.priority = .defaultHigh
-
         NSLayoutConstraint.activate([
-            self.titleLabel.topAnchor.constraint(
-                equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: DesignTokens.titleTopInset
-            ),
-            self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
-            self.titleLabel.trailingAnchor.constraint(
-                equalTo: self.customiseButton.leadingAnchor,
-                constant: -8
-            ),
-
-            customiseButtonCentre,
-            self.customiseButton.topAnchor.constraint(
-                greaterThanOrEqualTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: DesignTokens.glassPressClearance
-            ),
-            self.customiseButton.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
-            // Minimum rather than fixed, so the box still grows with the glyph at the
-            // accessibility text sizes. Square, because a glass button's intrinsic
-            // height exceeds that minimum while the width rests on it, which draws
-            // the container as an upright capsule rather than a circle.
-            self.customiseButton.widthAnchor.constraint(greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget),
-            self.customiseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget),
-            self.customiseButton.widthAnchor.constraint(equalTo: self.customiseButton.heightAnchor),
-
-            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: DesignTokens.titleSpacing),
+            self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             // Pinned past the safe area so tiles scroll under the tab bar.

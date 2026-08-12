@@ -38,8 +38,6 @@ final class TransactionsViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.view.addSubview(self.titleLabel)
-
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
         // Dismissal is driven from `scrollViewWillBeginDragging` rather than by
@@ -122,14 +120,7 @@ final class TransactionsViewController: TabRootViewController {
         )
 
         NSLayoutConstraint.activate([
-            self.titleLabel.topAnchor.constraint(
-                equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: DesignTokens.titleTopInset
-            ),
-            self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
-            self.titleLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
-
-            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: DesignTokens.titleSpacing),
+            self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             // Pinned past the safe area so rows scroll under the tab bar.

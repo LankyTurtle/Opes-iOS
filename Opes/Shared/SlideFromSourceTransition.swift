@@ -7,6 +7,15 @@ import UIKit
 /// drive their own presentation and ignore a custom animator — so the fixed-height
 /// card supplies its own grabber and dismissal gestures instead of using detents.
 final class SlideFromSourceTransition: NSObject {
+    /// Shared by every motion the card makes — presenting, dismissing, and settling
+    /// back after a drag that stopped short — so the whole thing moves as one piece.
+    ///
+    /// The card covers a lot of ground and changes scale on the way, so it reads as
+    /// abrupt at the duration a short system push uses. Damped high enough that the
+    /// longer travel settles rather than wobbles at the end.
+    fileprivate static let duration: TimeInterval = 0.6
+    fileprivate static let dampingRatio: CGFloat = 0.9
+
     private weak var sourceView: UIView?
 
     init(sourceView: UIView) {
@@ -193,31 +202,18 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         self.isCompletingPanDismissal = true
         presentedView.isUserInteractionEnabled = false
 
-        UIView.animate(
-            withDuration: 0.25,
-            delay: 0,
-            options: [.beginFromCurrentState, .curveEaseOut],
-            animations: {
-                presentedView.transform = CGAffineTransform(
-                    translationX: 0,
-                    y: presentedView.bounds.height
-                )
-                self.dimmingView.alpha = 0
-            },
-            completion: { [weak self] _ in
-                // The card has already completed its visual dismissal, so asking
-                // UIKit to tear down the presentation without a second animation
-                // avoids a direction change back toward the source tile.
-                self?.presentedViewController.dismiss(animated: false)
-            }
-        )
+        // Hand off to the shared dismissal animator, so a dragged card leaves the
+        // same way the Done button and the grabber's double tap send it — back
+        // toward the tile it grew from. The animator begins from the current state,
+        // so it picks the card up wherever the drag left it.
+        self.presentedViewController.dismiss(animated: true)
     }
 
     private func cancelPanDismissal(of presentedView: UIView) {
         UIView.animate(
-            withDuration: 0.35,
+            withDuration: SlideFromSourceTransition.duration,
             delay: 0,
-            usingSpringWithDamping: 0.82,
+            usingSpringWithDamping: SlideFromSourceTransition.dampingRatio,
             initialSpringVelocity: 0,
             options: [.beginFromCurrentState, .allowUserInteraction],
             animations: {
@@ -314,7 +310,7 @@ final class SlideFromSourceAnimator: NSObject, UIViewControllerAnimatedTransitio
     }
 
     func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
-        0.45
+        SlideFromSourceTransition.duration
     }
 
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
@@ -330,9 +326,17 @@ final class SlideFromSourceAnimator: NSObject, UIViewControllerAnimatedTransitio
             return
         }
 
+        // Dismissal derives the resting frame from centre and bounds rather than
+        // `frame`, because a drag leaves a transform applied and `frame` reports the
+        // dragged rect — which would offset the whole animation by the drag distance.
         let restingFrame = self.isPresenting
             ? transitionContext.finalFrame(for: viewController)
-            : transitionContext.initialFrame(for: viewController)
+            : CGRect(
+                x: view.center.x - view.bounds.width / 2,
+                y: view.center.y - view.bounds.height / 2,
+                width: view.bounds.width,
+                height: view.bounds.height
+            )
 
         if self.isPresenting {
             view.frame = restingFrame
@@ -352,7 +356,7 @@ final class SlideFromSourceAnimator: NSObject, UIViewControllerAnimatedTransitio
         UIView.animate(
             withDuration: self.transitionDuration(using: transitionContext),
             delay: 0,
-            usingSpringWithDamping: 0.86,
+            usingSpringWithDamping: SlideFromSourceTransition.dampingRatio,
             initialSpringVelocity: 0,
             options: [.beginFromCurrentState],
             animations: {

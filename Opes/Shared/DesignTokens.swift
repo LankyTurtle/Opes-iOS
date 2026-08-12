@@ -33,14 +33,17 @@ enum DesignTokens {
     /// per section position rather than by the cell's background configuration, and
     /// no API reports a sheet's own radius. So it stays a measured number, and it's
     /// one of the values worth checking against Apple's design resources.
-    static let cardCornerRadius: CGFloat = 20
+    static let cardCornerRadius: CGFloat = 40
 
-    /// Gap between the top safe area and a sheet at its large detent.
-    static let sheetTopInset: CGFloat = 4
+    /// A native large sheet begins at the top safe-area boundary.
+    static let sheetTopInset: CGFloat = 0
 
     /// The grabber a system sheet draws. There's no public class or view for it, so
     /// a hand-drawn card has to reproduce the shape — another measured pair.
-    static let grabberSize = CGSize(width: 36, height: 5)
+    ///
+    /// The width is measured against a native sheet rather than the 36 points older
+    /// iOS versions used; iOS 26 draws a noticeably wider grabber.
+    static let grabberSize = CGSize(width: 64, height: 5)
 
     /// Drop from a card's top edge to its grabber.
     static let grabberTopInset: CGFloat = 5

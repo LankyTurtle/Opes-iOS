@@ -44,10 +44,10 @@ final class HomeViewController: TabRootViewController {
         )
         self.customiseButton.configuration = customiseConfiguration
         // Tint only while held, so the glass frosts in the accent instead of white
-        // and the resting state is left alone. `.tintColor` resolves to the accent
-        // rather than naming the colour a second time.
+        // and the resting state is left alone. Named outright rather than resolved
+        // through `.tintColor`, which didn't take inside the configuration.
         self.customiseButton.configurationUpdateHandler = { button in
-            button.configuration?.baseBackgroundColor = button.isHighlighted ? .tintColor : nil
+            button.configuration?.baseBackgroundColor = button.isHighlighted ? .systemTeal : nil
         }
         self.customiseButton.translatesAutoresizingMaskIntoConstraints = false
         self.customiseButton.accessibilityLabel = "Customise Home"

@@ -8,11 +8,6 @@ import UIKit
 /// drag-to-resize/dismiss are traded away for the entrance animation. Height is
 /// fixed at presentation time instead of being a detent the user can drag between.
 final class SlideFromSourceTransition: NSObject {
-    /// Approximates the system sheet's own corner radius, measured off a screenshot
-    /// — there's no public API to read it, and the native sheet is now left on its
-    /// default rather than pinned to this value.
-    static let cardCornerRadius: CGFloat = 20
-
     private weak var sourceView: UIView?
 
     init(sourceView: UIView) {
@@ -50,10 +45,6 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
 
 /// Lays the card out along the bottom edge behind a dimmed backdrop.
 final class SlideFromSourcePresentationController: UIPresentationController {
-    /// Gap between the top safe area and the card, measured off the system sheet's
-    /// large detent. Adjust here if the two tops don't line up.
-    private static let largeDetentTopInset: CGFloat = 4
-
     private let dimmingView = UIView()
 
     override var frameOfPresentedViewInContainerView: CGRect {
@@ -62,7 +53,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         }
 
         let bounds = containerView.bounds
-        let top = containerView.safeAreaInsets.top + Self.largeDetentTopInset
+        let top = containerView.safeAreaInsets.top + DesignTokens.sheetTopInset
 
         return CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
     }
@@ -84,7 +75,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         containerView.addSubview(self.dimmingView)
 
         if let presentedView = self.presentedView {
-            presentedView.layer.cornerRadius = SlideFromSourceTransition.cardCornerRadius
+            presentedView.layer.cornerRadius = DesignTokens.sheetCornerRadius
             presentedView.layer.cornerCurve = .continuous
             presentedView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             presentedView.clipsToBounds = true

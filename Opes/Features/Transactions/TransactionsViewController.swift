@@ -25,9 +25,6 @@ final class TransactionsViewController: TabRootViewController {
     private var expandedSearchTrailingConstraint: NSLayoutConstraint!
     private var isSearchExpanded = false
 
-    /// `UISearchBar` insets its field from its own edges. Cancelling that out lines
-    /// the visible pill up with the list cells rather than sitting inside them.
-    private static let searchFieldInset: CGFloat = 8
     private static let compactSearchWidth: CGFloat = 152
     private static let compactPlaceholder = "Search"
     private static let expandedPlaceholder = "Search transactions"
@@ -115,24 +112,24 @@ final class TransactionsViewController: TabRootViewController {
         )
         self.expandedSearchLeadingConstraint = self.searchControl.leadingAnchor.constraint(
             equalTo: marginsGuide.leadingAnchor,
-            constant: -Self.searchFieldInset
+            constant: -DesignTokens.searchFieldInset
         )
         // Mirrors the leading inset. The close button's own content insets then sit
         // its glyph just inside the margin, matching where the field's text starts.
         self.expandedSearchTrailingConstraint = self.searchControl.trailingAnchor.constraint(
             equalTo: marginsGuide.trailingAnchor,
-            constant: Self.searchFieldInset
+            constant: DesignTokens.searchFieldInset
         )
 
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
                 equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: 8
+                constant: DesignTokens.titleTopInset
             ),
             self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
             self.titleLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
 
-            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: 8),
+            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: DesignTokens.titleSpacing),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             // Pinned past the safe area so rows scroll under the tab bar.

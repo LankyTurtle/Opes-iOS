@@ -23,8 +23,7 @@ class TabRootViewController: UIViewController {
         self.view.backgroundColor = .systemBackground
 
         self.titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        self.titleLabel.font = UIFontMetrics(forTextStyle: .largeTitle)
-            .scaledFont(for: .systemFont(ofSize: 34, weight: .bold))
+        self.titleLabel.font = DesignTokens.largeTitleFont
         self.titleLabel.adjustsFontForContentSizeCategory = true
         self.titleLabel.numberOfLines = 0
         self.titleLabel.text = self.title

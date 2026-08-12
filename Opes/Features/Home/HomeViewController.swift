@@ -93,7 +93,7 @@ final class HomeViewController: TabRootViewController {
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
                 equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: 8
+                constant: DesignTokens.titleTopInset
             ),
             self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
             self.titleLabel.trailingAnchor.constraint(
@@ -104,18 +104,18 @@ final class HomeViewController: TabRootViewController {
             customiseButtonCentre,
             self.customiseButton.topAnchor.constraint(
                 greaterThanOrEqualTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: 12
+                constant: DesignTokens.glassPressClearance
             ),
             self.customiseButton.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
             // Minimum rather than fixed, so the box still grows with the glyph at the
             // accessibility text sizes. Square, because a glass button's intrinsic
             // height exceeds that minimum while the width rests on it, which draws
             // the container as an upright capsule rather than a circle.
-            self.customiseButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            self.customiseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            self.customiseButton.widthAnchor.constraint(greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget),
+            self.customiseButton.heightAnchor.constraint(greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget),
             self.customiseButton.widthAnchor.constraint(equalTo: self.customiseButton.heightAnchor),
 
-            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: 8),
+            self.collectionView.topAnchor.constraint(equalTo: self.titleLabel.bottomAnchor, constant: DesignTokens.titleSpacing),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             // Pinned past the safe area so tiles scroll under the tab bar.

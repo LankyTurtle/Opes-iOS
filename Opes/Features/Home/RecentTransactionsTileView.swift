@@ -30,14 +30,14 @@ final class RecentTransactionsTileView: UIView {
         }
 
         NSLayoutConstraint.activate([
-            self.headerLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: 16),
-            self.headerLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
-            self.headerLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -16),
+            self.headerLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: DesignTokens.cardPadding),
+            self.headerLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: DesignTokens.cardPadding),
+            self.headerLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -DesignTokens.cardPadding),
 
-            self.rowsStack.topAnchor.constraint(equalTo: self.headerLabel.bottomAnchor, constant: 8),
-            self.rowsStack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
-            self.rowsStack.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -16),
-            self.rowsStack.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -8),
+            self.rowsStack.topAnchor.constraint(equalTo: self.headerLabel.bottomAnchor, constant: DesignTokens.titleSpacing),
+            self.rowsStack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: DesignTokens.cardPadding),
+            self.rowsStack.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -DesignTokens.cardPadding),
+            self.rowsStack.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -DesignTokens.titleSpacing),
         ])
     }
 
@@ -78,9 +78,9 @@ final class RecentTransactionsTileView: UIView {
         row.spacing = 12
         row.isLayoutMarginsRelativeArrangement = true
         row.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: 10,
+            top: DesignTokens.rowPadding,
             leading: 0,
-            bottom: 10,
+            bottom: DesignTokens.rowPadding,
             trailing: 0
         )
         return row

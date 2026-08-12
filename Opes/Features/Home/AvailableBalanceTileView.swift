@@ -30,8 +30,7 @@ final class AvailableBalanceTileView: UIControl {
         self.addSubview(self.disclosureView)
 
         self.balanceLabel.translatesAutoresizingMaskIntoConstraints = false
-        self.balanceLabel.font = UIFontMetrics(forTextStyle: .title1)
-            .scaledFont(for: .systemFont(ofSize: 28, weight: .bold))
+        self.balanceLabel.font = DesignTokens.tileValueFont
         self.balanceLabel.adjustsFontForContentSizeCategory = true
         // One line that shrinks to fit, so a long balance never wraps and shifts the
         // chevron off centre. Scaling needs a non-zero minimum to engage at all.
@@ -52,24 +51,24 @@ final class AvailableBalanceTileView: UIControl {
         self.accessibilityTraits = .button
 
         NSLayoutConstraint.activate([
-            self.headerLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: 16),
-            self.headerLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
-            self.headerLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -16),
+            self.headerLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: DesignTokens.cardPadding),
+            self.headerLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: DesignTokens.cardPadding),
+            self.headerLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -DesignTokens.cardPadding),
 
             self.disclosureView.centerYAnchor.constraint(equalTo: self.balanceLabel.centerYAnchor),
-            self.disclosureView.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -16),
+            self.disclosureView.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -DesignTokens.cardPadding),
 
-            self.balanceLabel.topAnchor.constraint(equalTo: self.headerLabel.bottomAnchor, constant: 4),
-            self.balanceLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
+            self.balanceLabel.topAnchor.constraint(equalTo: self.headerLabel.bottomAnchor, constant: DesignTokens.labelSpacing),
+            self.balanceLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: DesignTokens.cardPadding),
             self.balanceLabel.trailingAnchor.constraint(
                 equalTo: self.disclosureView.leadingAnchor,
                 constant: -8
             ),
 
-            self.countLabel.topAnchor.constraint(equalTo: self.balanceLabel.bottomAnchor, constant: 2),
-            self.countLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
-            self.countLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -16),
-            self.countLabel.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -16),
+            self.countLabel.topAnchor.constraint(equalTo: self.balanceLabel.bottomAnchor, constant: DesignTokens.captionSpacing),
+            self.countLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: DesignTokens.cardPadding),
+            self.countLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -DesignTokens.cardPadding),
+            self.countLabel.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -DesignTokens.cardPadding),
         ])
     }
 

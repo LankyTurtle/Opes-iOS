@@ -26,7 +26,7 @@ class PlaceholderViewController: TabRootViewController {
         NSLayoutConstraint.activate([
             self.titleLabel.topAnchor.constraint(
                 equalTo: self.view.safeAreaLayoutGuide.topAnchor,
-                constant: 8
+                constant: DesignTokens.titleTopInset
             ),
             self.titleLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
             self.titleLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),

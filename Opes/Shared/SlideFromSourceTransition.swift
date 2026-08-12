@@ -95,6 +95,8 @@ final class SlideFromSourcePresentationController: UIPresentationController {
             )
             doubleTapGesture.numberOfTapsRequired = 2
             self.grabberView.addGestureRecognizer(doubleTapGesture)
+            // Added last and left alone, rather than raised on every layout pass —
+            // reordering subviews during layout invalidates it again.
             presentedView.addSubview(self.grabberView)
 
             self.dismissPanGesture.delegate = self
@@ -117,10 +119,15 @@ final class SlideFromSourcePresentationController: UIPresentationController {
     override func containerViewWillLayoutSubviews() {
         super.containerViewWillLayoutSubviews()
 
-        self.presentedView?.frame = self.frameOfPresentedViewInContainerView
-
         guard let presentedView = self.presentedView else {
             return
+        }
+
+        // `frame` is undefined while a transform is applied. Assigning the resting
+        // rect mid-drag repositions the card so its *transformed* frame matches,
+        // which snaps it back up before the dismissal animates it down again.
+        if presentedView.transform.isIdentity {
+            presentedView.frame = self.frameOfPresentedViewInContainerView
         }
 
         let grabberHitWidth = max(
@@ -133,7 +140,6 @@ final class SlideFromSourcePresentationController: UIPresentationController {
             width: grabberHitWidth,
             height: DesignTokens.minimumTapTarget
         )
-        presentedView.bringSubviewToFront(self.grabberView)
     }
 
     @objc private func handleDimmingTap() {

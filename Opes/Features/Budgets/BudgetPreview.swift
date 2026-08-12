@@ -7,6 +7,7 @@ struct BudgetPreview: Hashable, Identifiable {
         case dining = "Dining"
         case entertainment = "Entertainment"
         case groceries = "Groceries"
+        case health = "Health"
         case shopping = "Shopping"
         case transport = "Transport"
 
@@ -18,6 +19,8 @@ struct BudgetPreview: Hashable, Identifiable {
                 return "play.rectangle.fill"
             case .groceries:
                 return "cart.fill"
+            case .health:
+                return "cross.case.fill"
             case .shopping:
                 return "bag.fill"
             case .transport:
@@ -80,6 +83,8 @@ extension BudgetPreview {
         .makeSample(category: .transport, spentCents: 14_270, limitCents: 25_000),
         .makeSample(category: .shopping, spentCents: 21_000, limitCents: 40_000),
         .makeSample(category: .entertainment, spentCents: 8_495, limitCents: 15_000),
+        // 4% spent, providing a visibly under-pace example for the placeholder data.
+        .makeSample(category: .health, spentCents: 1_200, limitCents: 30_000),
     ]
 
     private static func makeSample(

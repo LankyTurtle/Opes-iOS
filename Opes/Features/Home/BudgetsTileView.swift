@@ -75,9 +75,13 @@ final class BudgetsTileView: UIView {
         self.remainingLabel.text = formattedRemaining
         self.remainingLabel.textColor = remaining >= 0 ? .label : .systemRed
         self.spentLabel.text = "\(formattedSpent) spent of \(formattedLimit) this month"
+        // The Home summary always uses the plain progress bar. The chart choice on
+        // the Budgets screen is a way to interrogate the numbers there, not a
+        // preference that should follow the user around the app.
         self.progressView.configure(
             spendingProgress: max(spendingProgress, 0),
-            periodUnit: .monthly
+            periodUnit: .monthly,
+            style: .progress
         )
 
         self.isAccessibilityElement = true

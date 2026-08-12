@@ -22,6 +22,8 @@ final class BudgetsViewController: TabRootViewController {
 
     private var periodRefreshTimer: Timer?
 
+    private var chartStyle: BudgetChartStyle = .progress
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -104,6 +106,17 @@ final class BudgetsViewController: TabRootViewController {
         self.dataSource.apply(snapshot, animatingDifferences: false)
     }
 
+    /// Every row draws in the chosen style, so the whole list is reconfigured — the
+    /// identities don't change, so no rows animate in or out.
+    private func applyChartStyle(_ style: BudgetChartStyle) {
+        guard style != self.chartStyle else {
+            return
+        }
+
+        self.chartStyle = style
+        self.refreshPeriodTrackers()
+    }
+
     @objc private func handleSystemTimeChange(_ notification: Notification) {
         self.refreshPeriodTrackers()
     }
@@ -128,11 +141,14 @@ final class BudgetsViewController: TabRootViewController {
             switch item {
             case .overview:
                 let summaryView = BudgetSummaryView()
-                summaryView.configure(with: self.budgets)
+                summaryView.configure(with: self.budgets, style: self.chartStyle)
+                summaryView.onStyleChange = { [weak self] style in
+                    self?.applyChartStyle(style)
+                }
                 hostedView = summaryView
             case let .budget(budget):
                 let rowView = BudgetCategoryRowView()
-                rowView.configure(with: budget)
+                rowView.configure(with: budget, style: self.chartStyle)
                 hostedView = rowView
             }
 
@@ -166,6 +182,12 @@ extension BudgetsViewController: UICollectionViewDelegate {
 }
 
 private final class BudgetSummaryView: UIView {
+    /// Reports the chart the user picked, so the screen can redraw every row in it.
+    var onStyleChange: ((BudgetChartStyle) -> Void)?
+
+    private let styleControl = UISegmentedControl(
+        items: BudgetChartStyle.allCases.map(\.title)
+    )
     private let periodLabel = UILabel()
     private let remainingLabel = UILabel()
     private let spentLabel = UILabel()
@@ -191,12 +213,30 @@ private final class BudgetSummaryView: UIView {
         self.explanationLabel.adjustsFontForContentSizeCategory = true
         self.explanationLabel.textColor = .secondaryLabel
         self.explanationLabel.numberOfLines = 0
-        self.explanationLabel.text = "The marker shows where today falls in the month. Spending updates automatically as transactions are categorised."
+
+        self.styleControl.addAction(
+            UIAction { [weak self] _ in
+                guard let self else {
+                    return
+                }
+
+                let styles = BudgetChartStyle.allCases
+                let index = self.styleControl.selectedSegmentIndex
+
+                guard styles.indices.contains(index) else {
+                    return
+                }
+
+                self.onStyleChange?(styles[index])
+            },
+            for: .valueChanged
+        )
 
         let stack = UIStackView(arrangedSubviews: [
             self.periodLabel,
             self.remainingLabel,
             self.spentLabel,
+            self.styleControl,
             self.progressView,
             self.explanationLabel,
         ])
@@ -204,6 +244,7 @@ private final class BudgetSummaryView: UIView {
         stack.axis = .vertical
         stack.spacing = 8
         stack.setCustomSpacing(DesignTokens.labelSpacing, after: self.remainingLabel)
+        stack.setCustomSpacing(12, after: self.spentLabel)
         stack.setCustomSpacing(12, after: self.progressView)
         self.addSubview(stack)
 
@@ -220,7 +261,7 @@ private final class BudgetSummaryView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(with budgets: [BudgetPreview]) {
+    func configure(with budgets: [BudgetPreview], style: BudgetChartStyle) {
         let spent = budgets.reduce(Decimal.zero) { $0 + $1.spent }
         let limit = budgets.reduce(Decimal.zero) { $0 + $1.limit }
         let remaining = limit - spent
@@ -234,9 +275,12 @@ private final class BudgetSummaryView: UIView {
             : "\((-remaining).formatted(.currency(code: "AUD"))) over budget"
         self.remainingLabel.textColor = remaining >= 0 ? .label : .systemRed
         self.spentLabel.text = "\(spent.formatted(.currency(code: "AUD"))) spent of \(limit.formatted(.currency(code: "AUD")))"
+        self.styleControl.selectedSegmentIndex = BudgetChartStyle.allCases.firstIndex(of: style) ?? 0
+        self.explanationLabel.text = style.explanation
         self.progressView.configure(
             spendingProgress: max(ratio, 0),
-            periodUnit: .monthly
+            periodUnit: .monthly,
+            style: style
         )
     }
 }
@@ -302,7 +346,7 @@ private final class BudgetCategoryRowView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(with budget: BudgetPreview) {
+    func configure(with budget: BudgetPreview, style: BudgetChartStyle) {
         self.iconView.image = UIImage(systemName: budget.category.symbolName)
         self.iconView.tintColor = budget.statusColor
         self.categoryLabel.text = budget.category.rawValue
@@ -311,7 +355,8 @@ private final class BudgetCategoryRowView: UIView {
         self.statusLabel.textColor = budget.statusColor
         self.progressView.configure(
             spendingProgress: budget.progress,
-            periodUnit: budget.periodUnit
+            periodUnit: budget.periodUnit,
+            style: style
         )
     }
 }

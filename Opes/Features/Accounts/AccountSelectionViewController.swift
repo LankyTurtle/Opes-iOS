@@ -3,6 +3,8 @@ import UIKit
 /// Multi-select list of accounts, presented as a sheet, reporting each change back
 /// as it happens so the caller stays in step without waiting for a dismissal.
 final class AccountSelectionViewController: UIViewController {
+    private static let sheetTitle = "Select Accounts"
+
     private enum Section {
         case main
     }
@@ -12,8 +14,8 @@ final class AccountSelectionViewController: UIViewController {
     private let onChange: (Set<AccountPreview.ID>) -> Void
     private let usesCustomSheetToolbar: Bool
 
-    private let customSheetTitleLabel = UILabel()
-    private let customSheetDoneButton = UIButton(type: .system)
+    private let titleLabel = UILabel()
+    private let doneButton = UIButton(type: .system)
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -48,7 +50,7 @@ final class AccountSelectionViewController: UIViewController {
         if self.usesCustomSheetToolbar {
             self.configureCustomSheetToolbar()
         } else {
-            self.title = "Select Accounts"
+            self.title = Self.sheetTitle
             self.navigationItem.rightBarButtonItem = UIBarButtonItem(
                 barButtonSystemItem: .done,
                 target: self,
@@ -83,13 +85,13 @@ final class AccountSelectionViewController: UIViewController {
     /// Mirrors the Figma `Sheet – Full Screen – iPhone` toolbar. The presentation
     /// controller owns the grabber; this view owns the title and Done control.
     private func configureCustomSheetToolbar() {
-        self.customSheetTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        self.customSheetTitleLabel.font = .preferredFont(forTextStyle: .headline)
-        self.customSheetTitleLabel.adjustsFontForContentSizeCategory = true
-        self.customSheetTitleLabel.text = "Select Accounts"
-        self.customSheetTitleLabel.textAlignment = .center
-        self.customSheetTitleLabel.numberOfLines = 1
-        self.view.addSubview(self.customSheetTitleLabel)
+        self.titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        self.titleLabel.font = .preferredFont(forTextStyle: .headline)
+        self.titleLabel.adjustsFontForContentSizeCategory = true
+        self.titleLabel.text = Self.sheetTitle
+        self.titleLabel.textAlignment = .center
+        self.titleLabel.numberOfLines = 1
+        self.view.addSubview(self.titleLabel)
 
         var configuration = UIButton.Configuration.glass()
         configuration.image = UIImage(
@@ -98,45 +100,45 @@ final class AccountSelectionViewController: UIViewController {
         )
         configuration.baseBackgroundColor = .systemTeal
         configuration.baseForegroundColor = .white
-        self.customSheetDoneButton.configuration = configuration
-        self.customSheetDoneButton.translatesAutoresizingMaskIntoConstraints = false
-        self.customSheetDoneButton.accessibilityLabel = "Done"
-        self.customSheetDoneButton.addTarget(
+        self.doneButton.configuration = configuration
+        self.doneButton.translatesAutoresizingMaskIntoConstraints = false
+        self.doneButton.accessibilityLabel = "Done"
+        self.doneButton.addTarget(
             self,
             action: #selector(self.handleDone),
             for: .touchUpInside
         )
-        self.view.addSubview(self.customSheetDoneButton)
+        self.view.addSubview(self.doneButton)
 
         NSLayoutConstraint.activate([
-            self.customSheetDoneButton.topAnchor.constraint(
+            self.doneButton.topAnchor.constraint(
                 equalTo: self.view.topAnchor,
                 constant: DesignTokens.sheetToolbarControlsTopInset
             ),
-            self.customSheetDoneButton.trailingAnchor.constraint(
+            self.doneButton.trailingAnchor.constraint(
                 equalTo: self.view.trailingAnchor,
                 constant: -DesignTokens.sheetToolbarHorizontalInset
             ),
-            self.customSheetDoneButton.widthAnchor.constraint(
+            self.doneButton.widthAnchor.constraint(
                 equalToConstant: DesignTokens.minimumTapTarget
             ),
-            self.customSheetDoneButton.heightAnchor.constraint(
+            self.doneButton.heightAnchor.constraint(
                 equalToConstant: DesignTokens.minimumTapTarget
             ),
 
-            self.customSheetTitleLabel.leadingAnchor.constraint(
+            self.titleLabel.leadingAnchor.constraint(
                 greaterThanOrEqualTo: self.view.leadingAnchor,
                 constant: DesignTokens.sheetToolbarHorizontalInset + DesignTokens.minimumTapTarget + 8
             ),
-            self.customSheetTitleLabel.trailingAnchor.constraint(
-                lessThanOrEqualTo: self.customSheetDoneButton.leadingAnchor,
+            self.titleLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: self.doneButton.leadingAnchor,
                 constant: -8
             ),
-            self.customSheetTitleLabel.centerXAnchor.constraint(
+            self.titleLabel.centerXAnchor.constraint(
                 equalTo: self.view.centerXAnchor
             ),
-            self.customSheetTitleLabel.centerYAnchor.constraint(
-                equalTo: self.customSheetDoneButton.centerYAnchor
+            self.titleLabel.centerYAnchor.constraint(
+                equalTo: self.doneButton.centerYAnchor
             ),
         ])
     }

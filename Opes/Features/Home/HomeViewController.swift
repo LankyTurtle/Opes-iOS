@@ -11,6 +11,7 @@ final class HomeViewController: TabRootViewController {
     private lazy var dataSource = self.makeDataSource()
 
     private let balanceTile = AvailableBalanceTileView()
+    private let budgetsTile = BudgetsTileView()
     private let customTile = AvailableBalanceTileView()
     private lazy var recentTile = RecentTransactionsTileView(
         transactions: Self.recentTransactions()
@@ -124,6 +125,25 @@ final class HomeViewController: TabRootViewController {
 
         self.apply(order: self.tileOrder, animated: false)
         self.refreshTiles()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.handleAppDidBecomeActive(_:)),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        // Refreshing here moves the budget-period marker to the current system date
+        // whenever Home is revisited or the app returns to the foreground.
+        self.refreshTiles()
+    }
+
+    @objc private func handleAppDidBecomeActive(_ notification: Notification) {
+        self.refreshTiles()
     }
 
     @objc private func handleCustomiseTap() {
@@ -196,6 +216,7 @@ final class HomeViewController: TabRootViewController {
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
         self.balanceTile.show(balance: balance, accountCount: selected.count)
+        self.budgetsTile.show(budgets: BudgetPreview.sample)
         self.customTile.show(balance: balance, accountCount: selected.count)
     }
 
@@ -215,6 +236,8 @@ final class HomeViewController: TabRootViewController {
         switch tile {
         case .balance:
             return self.balanceTile
+        case .budgets:
+            return self.budgetsTile
         case .custom:
             return self.customTile
         case .recentTransactions:

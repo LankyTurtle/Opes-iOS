@@ -4,9 +4,8 @@ import UIKit
 /// at the size and position of a source view so it reads as coming out of it.
 ///
 /// This replaces `UISheetPresentationController` rather than decorating it — sheets
-/// drive their own presentation and ignore a custom animator — so the grabber and
-/// drag-to-resize/dismiss are traded away for the entrance animation. Height is
-/// fixed at presentation time instead of being a detent the user can drag between.
+/// drive their own presentation and ignore a custom animator — so the fixed-height
+/// card supplies its own grabber and dismissal gestures instead of using detents.
 final class SlideFromSourceTransition: NSObject {
     private weak var sourceView: UIView?
 
@@ -46,6 +45,13 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
 /// Lays the card out along the bottom edge behind a dimmed backdrop.
 final class SlideFromSourcePresentationController: UIPresentationController {
     private let dimmingView = UIView()
+    private let grabberView = SheetGrabberView()
+    private lazy var dismissPanGesture = UIPanGestureRecognizer(
+        target: self,
+        action: #selector(self.handleDismissPan(_:))
+    )
+
+    private var isCompletingPanDismissal = false
 
     override var frameOfPresentedViewInContainerView: CGRect {
         guard let containerView = self.containerView else {
@@ -79,6 +85,20 @@ final class SlideFromSourcePresentationController: UIPresentationController {
             presentedView.layer.cornerCurve = .continuous
             presentedView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             presentedView.clipsToBounds = true
+
+            self.grabberView.onAccessibilityActivate = { [weak self] in
+                self?.dismissPresentedViewController()
+            }
+            let doubleTapGesture = UITapGestureRecognizer(
+                target: self,
+                action: #selector(self.handleGrabberDoubleTap)
+            )
+            doubleTapGesture.numberOfTapsRequired = 2
+            self.grabberView.addGestureRecognizer(doubleTapGesture)
+            presentedView.addSubview(self.grabberView)
+
+            self.dismissPanGesture.delegate = self
+            presentedView.addGestureRecognizer(self.dismissPanGesture)
         }
 
         _ = self.presentedViewController.transitionCoordinator?.animate { _ in
@@ -98,11 +118,176 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         super.containerViewWillLayoutSubviews()
 
         self.presentedView?.frame = self.frameOfPresentedViewInContainerView
+
+        guard let presentedView = self.presentedView else {
+            return
+        }
+
+        let grabberHitWidth = max(
+            DesignTokens.minimumTapTarget * 2,
+            DesignTokens.grabberSize.width
+        )
+        self.grabberView.frame = CGRect(
+            x: (presentedView.bounds.width - grabberHitWidth) / 2,
+            y: 0,
+            width: grabberHitWidth,
+            height: DesignTokens.minimumTapTarget
+        )
+        presentedView.bringSubviewToFront(self.grabberView)
     }
 
     @objc private func handleDimmingTap() {
-        // The only way out other than Done, now that there's no drag-to-dismiss.
+        self.dismissPresentedViewController()
+    }
+
+    @objc private func handleGrabberDoubleTap() {
+        self.dismissPresentedViewController()
+    }
+
+    @objc private func handleDismissPan(_ gesture: UIPanGestureRecognizer) {
+        guard
+            !self.isCompletingPanDismissal,
+            let presentedView = self.presentedView
+        else {
+            return
+        }
+
+        let translation = gesture.translation(in: presentedView)
+        let downwardTranslation = max(translation.y, 0)
+
+        switch gesture.state {
+        case .changed:
+            presentedView.transform = CGAffineTransform(
+                translationX: 0,
+                y: downwardTranslation
+            )
+
+            let fadeDistance = max(presentedView.bounds.height * 0.5, 1)
+            self.dimmingView.alpha = max(1 - downwardTranslation / fadeDistance, 0)
+
+        case .ended:
+            let downwardVelocity = gesture.velocity(in: presentedView).y
+            let dismissalDistance = min(presentedView.bounds.height * 0.2, 180)
+
+            if downwardTranslation >= dismissalDistance || downwardVelocity >= 900 {
+                self.completePanDismissal(of: presentedView)
+            } else {
+                self.cancelPanDismissal(of: presentedView)
+            }
+
+        case .cancelled, .failed:
+            self.cancelPanDismissal(of: presentedView)
+
+        default:
+            break
+        }
+    }
+
+    private func completePanDismissal(of presentedView: UIView) {
+        self.isCompletingPanDismissal = true
+        presentedView.isUserInteractionEnabled = false
+
+        UIView.animate(
+            withDuration: 0.25,
+            delay: 0,
+            options: [.beginFromCurrentState, .curveEaseOut],
+            animations: {
+                presentedView.transform = CGAffineTransform(
+                    translationX: 0,
+                    y: presentedView.bounds.height
+                )
+                self.dimmingView.alpha = 0
+            },
+            completion: { [weak self] _ in
+                // The card has already completed its visual dismissal, so asking
+                // UIKit to tear down the presentation without a second animation
+                // avoids a direction change back toward the source tile.
+                self?.presentedViewController.dismiss(animated: false)
+            }
+        )
+    }
+
+    private func cancelPanDismissal(of presentedView: UIView) {
+        UIView.animate(
+            withDuration: 0.35,
+            delay: 0,
+            usingSpringWithDamping: 0.82,
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction],
+            animations: {
+                presentedView.transform = .identity
+                self.dimmingView.alpha = 1
+            }
+        )
+    }
+
+    private func dismissPresentedViewController() {
+        guard !self.isCompletingPanDismissal else {
+            return
+        }
+
         self.presentedViewController.dismiss(animated: true)
+    }
+}
+
+extension SlideFromSourcePresentationController: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard
+            gestureRecognizer === self.dismissPanGesture,
+            let panGesture = gestureRecognizer as? UIPanGestureRecognizer,
+            let presentedView = self.presentedView
+        else {
+            return true
+        }
+
+        let touchLocation = panGesture.location(in: presentedView)
+        let velocity = panGesture.velocity(in: presentedView)
+
+        return touchLocation.y <= DesignTokens.cardDragRegionHeight
+            && velocity.y > 0
+            && velocity.y > abs(velocity.x)
+    }
+}
+
+/// A system-sized grabber with a larger transparent hit target. VoiceOver's normal
+/// activation gesture follows the same dismissal path as a pointer double-click.
+private final class SheetGrabberView: UIView {
+    private let indicatorView = UIView()
+    var onAccessibilityActivate: (() -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        self.isAccessibilityElement = true
+        self.accessibilityLabel = "Dismiss sheet"
+        self.accessibilityHint = "Double-tap or swipe down to dismiss"
+        self.accessibilityTraits = .button
+
+        self.indicatorView.backgroundColor = .tertiaryLabel
+        self.indicatorView.layer.cornerRadius = DesignTokens.grabberSize.height / 2
+        self.indicatorView.isUserInteractionEnabled = false
+        self.addSubview(self.indicatorView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        self.indicatorView.frame = CGRect(
+            x: (self.bounds.width - DesignTokens.grabberSize.width) / 2,
+            y: DesignTokens.grabberTopInset,
+            width: DesignTokens.grabberSize.width,
+            height: DesignTokens.grabberSize.height
+        )
+    }
+
+    override func accessibilityActivate() -> Bool {
+        self.onAccessibilityActivate?()
+        return true
     }
 }
 
@@ -129,18 +314,29 @@ final class SlideFromSourceAnimator: NSObject, UIViewControllerAnimatedTransitio
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         let containerView = transitionContext.containerView
         let viewKey: UITransitionContextViewKey = self.isPresenting ? .to : .from
+        let controllerKey: UITransitionContextViewControllerKey = self.isPresenting ? .to : .from
 
-        guard let view = transitionContext.view(forKey: viewKey) else {
+        guard
+            let view = transitionContext.view(forKey: viewKey),
+            let viewController = transitionContext.viewController(forKey: controllerKey)
+        else {
             transitionContext.completeTransition(false)
             return
         }
 
-        if self.isPresenting, let presented = transitionContext.viewController(forKey: .to) {
-            view.frame = transitionContext.finalFrame(for: presented)
+        let restingFrame = self.isPresenting
+            ? transitionContext.finalFrame(for: viewController)
+            : transitionContext.initialFrame(for: viewController)
+
+        if self.isPresenting {
+            view.frame = restingFrame
             containerView.addSubview(view)
         }
 
-        let offsetTransform = self.offsetTransform(for: view, in: containerView)
+        let offsetTransform = self.offsetTransform(
+            for: restingFrame,
+            in: containerView
+        )
 
         if self.isPresenting {
             view.transform = offsetTransform
@@ -171,8 +367,10 @@ final class SlideFromSourceAnimator: NSObject, UIViewControllerAnimatedTransitio
     }
 
     /// Maps the card's resting frame onto the source view's, then pushes it right.
-    private func offsetTransform(for view: UIView, in containerView: UIView) -> CGAffineTransform {
-        let restingFrame = view.frame
+    private func offsetTransform(
+        for restingFrame: CGRect,
+        in containerView: UIView
+    ) -> CGAffineTransform {
         let travel = containerView.bounds.width * Self.horizontalTravel
 
         guard restingFrame.width > 0, restingFrame.height > 0 else {

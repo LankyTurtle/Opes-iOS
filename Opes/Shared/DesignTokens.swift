@@ -38,6 +38,17 @@ enum DesignTokens {
     /// Gap between the top safe area and a sheet at its large detent.
     static let sheetTopInset: CGFloat = 4
 
+    /// The grabber a system sheet draws. There's no public class or view for it, so
+    /// a hand-drawn card has to reproduce the shape — another measured pair.
+    static let grabberSize = CGSize(width: 36, height: 5)
+
+    /// Drop from a card's top edge to its grabber.
+    static let grabberTopInset: CGFloat = 5
+
+    /// Height of the region at a card's top edge that responds to a dismissing
+    /// drag, covering the grabber and the navigation bar behind it.
+    static let cardDragRegionHeight: CGFloat = 64
+
     /// Smallest comfortable tap target.
     static let minimumTapTarget: CGFloat = 44
 

@@ -155,7 +155,7 @@ final class HomeViewController: TabRootViewController {
     }
 
     /// Custom presentation: fixed-height card flying in right to left out of the
-    /// tile, at the cost of the grabber and drag-to-dismiss.
+    /// tile, with a hand-drawn grabber because system sheet chrome is unavailable.
     @objc private func handleCustomTileTap() {
         let navigationController = UINavigationController(rootViewController: self.makeAccountSelection())
 

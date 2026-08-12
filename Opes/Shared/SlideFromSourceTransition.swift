@@ -75,7 +75,7 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         containerView.addSubview(self.dimmingView)
 
         if let presentedView = self.presentedView {
-            presentedView.layer.cornerRadius = DesignTokens.sheetCornerRadius
+            presentedView.layer.cornerRadius = DesignTokens.cardCornerRadius
             presentedView.layer.cornerCurve = .continuous
             presentedView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             presentedView.clipsToBounds = true

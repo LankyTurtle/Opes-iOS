@@ -139,15 +139,11 @@ final class SlideFromSourcePresentationController: UIPresentationController {
             presentedView.frame = self.frameOfPresentedViewInContainerView
         }
 
-        let grabberHitWidth = max(
-            DesignTokens.minimumTapTarget * 2,
-            DesignTokens.grabberSize.width
-        )
         self.grabberView.frame = CGRect(
-            x: (presentedView.bounds.width - grabberHitWidth) / 2,
+            x: (presentedView.bounds.width - DesignTokens.grabberSize.width) / 2,
             y: 0,
-            width: grabberHitWidth,
-            height: DesignTokens.minimumTapTarget
+            width: DesignTokens.grabberSize.width,
+            height: DesignTokens.sheetToolbarControlsTopInset
         )
     }
 

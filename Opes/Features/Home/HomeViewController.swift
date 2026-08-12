@@ -177,22 +177,25 @@ final class HomeViewController: TabRootViewController {
     /// Custom presentation: fixed-height card flying in right to left out of the
     /// tile, with a hand-drawn grabber because system sheet chrome is unavailable.
     @objc private func handleCustomTileTap() {
-        let navigationController = UINavigationController(rootViewController: self.makeAccountSelection())
+        let accountSelection = self.makeAccountSelection(usesCustomSheetToolbar: true)
 
         let transition = SlideFromSourceTransition(sourceView: self.customTile)
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 
-        navigationController.modalPresentationStyle = .custom
-        navigationController.transitioningDelegate = transition
+        accountSelection.modalPresentationStyle = .custom
+        accountSelection.transitioningDelegate = transition
 
-        self.present(navigationController, animated: true)
+        self.present(accountSelection, animated: true)
     }
 
-    private func makeAccountSelection() -> AccountSelectionViewController {
+    private func makeAccountSelection(
+        usesCustomSheetToolbar: Bool = false
+    ) -> AccountSelectionViewController {
         AccountSelectionViewController(
             accounts: self.accounts,
-            selectedIDs: self.selectedAccountIDs
+            selectedIDs: self.selectedAccountIDs,
+            usesCustomSheetToolbar: usesCustomSheetToolbar
         ) { [weak self] selectedIDs in
             self?.selectedAccountIDs = selectedIDs
             self?.refreshTiles()

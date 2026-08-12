@@ -10,6 +10,10 @@ final class AccountSelectionViewController: UIViewController {
     private let accounts: [AccountPreview]
     private var selectedIDs: Set<AccountPreview.ID>
     private let onChange: (Set<AccountPreview.ID>) -> Void
+    private let usesCustomSheetToolbar: Bool
+
+    private let customSheetTitleLabel = UILabel()
+    private let customSheetDoneButton = UIButton(type: .system)
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -21,10 +25,12 @@ final class AccountSelectionViewController: UIViewController {
     init(
         accounts: [AccountPreview],
         selectedIDs: Set<AccountPreview.ID>,
+        usesCustomSheetToolbar: Bool = false,
         onChange: @escaping (Set<AccountPreview.ID>) -> Void
     ) {
         self.accounts = accounts
         self.selectedIDs = selectedIDs
+        self.usesCustomSheetToolbar = usesCustomSheetToolbar
         self.onChange = onChange
         super.init(nibName: nil, bundle: nil)
     }
@@ -37,13 +43,18 @@ final class AccountSelectionViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.title = "Select Accounts"
         self.view.backgroundColor = .systemGroupedBackground
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .done,
-            target: self,
-            action: #selector(self.handleDone)
-        )
+
+        if self.usesCustomSheetToolbar {
+            self.configureCustomSheetToolbar()
+        } else {
+            self.title = "Select Accounts"
+            self.navigationItem.rightBarButtonItem = UIBarButtonItem(
+                barButtonSystemItem: .done,
+                target: self,
+                action: #selector(self.handleDone)
+            )
+        }
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -54,7 +65,10 @@ final class AccountSelectionViewController: UIViewController {
         self.view.addSubview(self.collectionView)
 
         NSLayoutConstraint.activate([
-            self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
+            self.collectionView.topAnchor.constraint(
+                equalTo: self.view.topAnchor,
+                constant: self.usesCustomSheetToolbar ? DesignTokens.sheetToolbarHeight : 0
+            ),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             self.collectionView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
@@ -64,6 +78,67 @@ final class AccountSelectionViewController: UIViewController {
         snapshot.appendSections([.main])
         snapshot.appendItems(self.accounts, toSection: .main)
         self.dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    /// Mirrors the Figma `Sheet – Full Screen – iPhone` toolbar. The presentation
+    /// controller owns the grabber; this view owns the title and Done control.
+    private func configureCustomSheetToolbar() {
+        self.customSheetTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        self.customSheetTitleLabel.font = .preferredFont(forTextStyle: .headline)
+        self.customSheetTitleLabel.adjustsFontForContentSizeCategory = true
+        self.customSheetTitleLabel.text = "Select Accounts"
+        self.customSheetTitleLabel.textAlignment = .center
+        self.customSheetTitleLabel.numberOfLines = 1
+        self.view.addSubview(self.customSheetTitleLabel)
+
+        var configuration = UIButton.Configuration.glass()
+        configuration.image = UIImage(
+            systemName: "checkmark",
+            withConfiguration: UIImage.SymbolConfiguration(textStyle: .title3)
+        )
+        configuration.baseBackgroundColor = .systemTeal
+        configuration.baseForegroundColor = .white
+        self.customSheetDoneButton.configuration = configuration
+        self.customSheetDoneButton.translatesAutoresizingMaskIntoConstraints = false
+        self.customSheetDoneButton.accessibilityLabel = "Done"
+        self.customSheetDoneButton.addTarget(
+            self,
+            action: #selector(self.handleDone),
+            for: .touchUpInside
+        )
+        self.view.addSubview(self.customSheetDoneButton)
+
+        NSLayoutConstraint.activate([
+            self.customSheetDoneButton.topAnchor.constraint(
+                equalTo: self.view.topAnchor,
+                constant: DesignTokens.sheetToolbarControlsTopInset
+            ),
+            self.customSheetDoneButton.trailingAnchor.constraint(
+                equalTo: self.view.trailingAnchor,
+                constant: -DesignTokens.sheetToolbarHorizontalInset
+            ),
+            self.customSheetDoneButton.widthAnchor.constraint(
+                equalToConstant: DesignTokens.minimumTapTarget
+            ),
+            self.customSheetDoneButton.heightAnchor.constraint(
+                equalToConstant: DesignTokens.minimumTapTarget
+            ),
+
+            self.customSheetTitleLabel.leadingAnchor.constraint(
+                greaterThanOrEqualTo: self.view.leadingAnchor,
+                constant: DesignTokens.sheetToolbarHorizontalInset + DesignTokens.minimumTapTarget + 8
+            ),
+            self.customSheetTitleLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: self.customSheetDoneButton.leadingAnchor,
+                constant: -8
+            ),
+            self.customSheetTitleLabel.centerXAnchor.constraint(
+                equalTo: self.view.centerXAnchor
+            ),
+            self.customSheetTitleLabel.centerYAnchor.constraint(
+                equalTo: self.customSheetDoneButton.centerYAnchor
+            ),
+        ])
     }
 
     @objc private func handleDone() {

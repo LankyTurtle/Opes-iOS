@@ -33,24 +33,30 @@ enum DesignTokens {
     /// per section position rather than by the cell's background configuration, and
     /// no API reports a sheet's own radius. So it stays a measured number, and it's
     /// one of the values worth checking against Apple's design resources.
-    static let cardCornerRadius: CGFloat = 40
+    static let cardCornerRadius: CGFloat = 38
 
     /// A native large sheet begins at the top safe-area boundary.
     static let sheetTopInset: CGFloat = 0
 
-    /// The grabber a system sheet draws. There's no public class or view for it, so
-    /// a hand-drawn card has to reproduce the shape — another measured pair.
-    ///
-    /// The width is measured against a native sheet rather than the 36 points older
-    /// iOS versions used; iOS 26 draws a noticeably wider grabber.
-    static let grabberSize = CGSize(width: 64, height: 5)
+    /// Figma's full-screen iPhone sheet uses a 36 × 5 point grabber.
+    static let grabberSize = CGSize(width: 36, height: 5)
 
     /// Drop from a card's top edge to its grabber.
     static let grabberTopInset: CGFloat = 5
 
+    /// Height of Figma's sheet toolbar: a 16 point grabber region followed by a
+    /// 44 point title-and-controls row, with 10 points of bottom clearance.
+    static let sheetToolbarHeight: CGFloat = 70
+
+    /// The title-and-controls row starts directly below the 16 point grabber region.
+    static let sheetToolbarControlsTopInset: CGFloat = 16
+
+    /// Horizontal inset for the toolbar's leading and trailing controls.
+    static let sheetToolbarHorizontalInset: CGFloat = 16
+
     /// Height of the region at a card's top edge that responds to a dismissing
-    /// drag, covering the grabber and the navigation bar behind it.
-    static let cardDragRegionHeight: CGFloat = 64
+    /// drag, matching the whole Figma toolbar.
+    static let cardDragRegionHeight: CGFloat = sheetToolbarHeight
 
     /// Smallest comfortable tap target.
     static let minimumTapTarget: CGFloat = 44

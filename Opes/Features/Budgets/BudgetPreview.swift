@@ -29,6 +29,7 @@ struct BudgetPreview: Hashable, Identifiable {
     let category: Category
     let spent: Decimal
     let limit: Decimal
+    let periodUnit: BudgetPeriodUnit
 
     var id: Category {
         self.category
@@ -84,12 +85,14 @@ extension BudgetPreview {
     private static func makeSample(
         category: Category,
         spentCents: Int,
-        limitCents: Int
+        limitCents: Int,
+        periodUnit: BudgetPeriodUnit = .monthly
     ) -> BudgetPreview {
         BudgetPreview(
             category: category,
             spent: Decimal(spentCents) / 100,
-            limit: Decimal(limitCents) / 100
+            limit: Decimal(limitCents) / 100,
+            periodUnit: periodUnit
         )
     }
 }

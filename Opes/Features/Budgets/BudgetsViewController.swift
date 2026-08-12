@@ -20,6 +20,8 @@ final class BudgetsViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
+    private var periodRefreshTimer: Timer?
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -50,6 +52,38 @@ final class BudgetsViewController: TabRootViewController {
         ])
 
         self.applySnapshot()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.handleSystemTimeChange(_:)),
+            name: UIApplication.significantTimeChangeNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(self.handleSystemTimeChange(_:)),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        self.refreshPeriodTrackers()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        self.startPeriodRefreshTimer()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+
+        self.periodRefreshTimer?.invalidate()
+        self.periodRefreshTimer = nil
     }
 
     private func applySnapshot() {
@@ -58,6 +92,34 @@ final class BudgetsViewController: TabRootViewController {
         snapshot.appendItems([.overview], toSection: .overview)
         snapshot.appendItems(self.budgets.map(Item.budget), toSection: .categories)
         self.dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func startPeriodRefreshTimer() {
+        self.periodRefreshTimer?.invalidate()
+
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            self?.refreshPeriodTrackers()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.periodRefreshTimer = timer
+    }
+
+    /// Reconfiguring obtains a fresh `Date.now` for every visible tracker without
+    /// changing the list's identity or animating its rows.
+    private func refreshPeriodTrackers() {
+        var snapshot = self.dataSource.snapshot()
+        let items = snapshot.itemIdentifiers
+
+        guard !items.isEmpty else {
+            return
+        }
+
+        snapshot.reconfigureItems(items)
+        self.dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    @objc private func handleSystemTimeChange(_ notification: Notification) {
+        self.refreshPeriodTrackers()
     }
 
     private static func makeLayout() -> UICollectionViewLayout {
@@ -121,7 +183,7 @@ private final class BudgetSummaryView: UIView {
     private let periodLabel = UILabel()
     private let remainingLabel = UILabel()
     private let spentLabel = UILabel()
-    private let progressView = UIProgressView(progressViewStyle: .default)
+    private let progressView = BudgetProgressView()
     private let explanationLabel = UILabel()
 
     override init(frame: CGRect) {
@@ -139,13 +201,11 @@ private final class BudgetSummaryView: UIView {
         self.spentLabel.textColor = .secondaryLabel
         self.spentLabel.numberOfLines = 0
 
-        self.progressView.trackTintColor = .tertiarySystemFill
-
         self.explanationLabel.font = .preferredFont(forTextStyle: .footnote)
         self.explanationLabel.adjustsFontForContentSizeCategory = true
         self.explanationLabel.textColor = .secondaryLabel
         self.explanationLabel.numberOfLines = 0
-        self.explanationLabel.text = "Updates automatically as transactions are categorised."
+        self.explanationLabel.text = "The marker shows where today falls in the month. Spending updates automatically as transactions are categorised."
 
         let stack = UIStackView(arrangedSubviews: [
             self.periodLabel,
@@ -188,8 +248,11 @@ private final class BudgetSummaryView: UIView {
             : "\((-remaining).formatted(.currency(code: "AUD"))) over budget"
         self.remainingLabel.textColor = remaining >= 0 ? .label : .systemRed
         self.spentLabel.text = "\(spent.formatted(.currency(code: "AUD"))) spent of \(limit.formatted(.currency(code: "AUD")))"
-        self.progressView.progress = min(max(ratio, 0), 1)
-        self.progressView.progressTintColor = remaining >= 0 ? .systemTeal : .systemRed
+        self.progressView.configure(
+            spendingProgress: min(max(ratio, 0), 1),
+            periodUnit: .monthly,
+            tintColor: remaining >= 0 ? .systemTeal : .systemRed
+        )
     }
 }
 
@@ -198,7 +261,7 @@ private final class BudgetCategoryRowView: UIView {
     private let categoryLabel = UILabel()
     private let detailLabel = UILabel()
     private let statusLabel = UILabel()
-    private let progressView = UIProgressView(progressViewStyle: .default)
+    private let progressView = BudgetProgressView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -218,8 +281,6 @@ private final class BudgetCategoryRowView: UIView {
         self.statusLabel.textAlignment = .right
         self.statusLabel.setContentHuggingPriority(.required, for: .horizontal)
         self.statusLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-
-        self.progressView.trackTintColor = .tertiarySystemFill
 
         let labelStack = UIStackView(arrangedSubviews: [self.categoryLabel, self.detailLabel])
         labelStack.axis = .vertical
@@ -260,10 +321,13 @@ private final class BudgetCategoryRowView: UIView {
         self.iconView.image = UIImage(systemName: budget.category.symbolName)
         self.iconView.tintColor = budget.statusColor
         self.categoryLabel.text = budget.category.rawValue
-        self.detailLabel.text = "\(budget.formattedSpent) of \(budget.formattedLimit)"
+        self.detailLabel.text = "\(budget.formattedSpent) of \(budget.formattedLimit) · \(budget.periodUnit.rawValue)"
         self.statusLabel.text = budget.formattedStatus
         self.statusLabel.textColor = budget.statusColor
-        self.progressView.progress = budget.progress
-        self.progressView.progressTintColor = budget.statusColor
+        self.progressView.configure(
+            spendingProgress: budget.progress,
+            periodUnit: budget.periodUnit,
+            tintColor: budget.statusColor
+        )
     }
 }

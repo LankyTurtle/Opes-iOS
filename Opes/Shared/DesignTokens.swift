@@ -26,15 +26,14 @@ enum DesignTokens {
     /// Gap between a screen's title and the content beneath it.
     static let titleSpacing: CGFloat = 8
 
-    /// Corner radius for a hand-drawn card.
+    /// Corner radius for a hand-drawn card, measured against a system sheet.
     ///
-    /// Nothing reports a system sheet's own radius, so this borrows the closest
-    /// value that is readable — the background configuration the system applies to
-    /// inset grouped cells. Semantically adjacent rather than identical, but it is
-    /// a real system value that follows OS changes, where a measured number can't.
-    static var cardCornerRadius: CGFloat {
-        UIBackgroundConfiguration.listGroupedCell().cornerRadius
-    }
+    /// Deriving this doesn't work. `UIBackgroundConfiguration.listGroupedCell()`
+    /// reports a radius of zero, because a grouped list is rounded by the layout
+    /// per section position rather than by the cell's background configuration, and
+    /// no API reports a sheet's own radius. So it stays a measured number, and it's
+    /// one of the values worth checking against Apple's design resources.
+    static let cardCornerRadius: CGFloat = 20
 
     /// Gap between the top safe area and a sheet at its large detent.
     static let sheetTopInset: CGFloat = 4

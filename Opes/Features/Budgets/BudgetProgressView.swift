@@ -65,6 +65,8 @@ final class BudgetProgressView: UIView {
     private static let trackHeight: CGFloat = 6
     private static let markerWidth: CGFloat = 2
     private static let markerHeight: CGFloat = 14
+    /// Two-and-a-half percentage points on either side of elapsed time is considered on pace.
+    private static let onPaceTolerance: CGFloat = 0.025
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: Self.markerHeight)
@@ -110,7 +112,7 @@ final class BudgetProgressView: UIView {
         self.fillView.frame = CGRect(
             x: 0,
             y: 0,
-            width: self.bounds.width * self.spendingProgress,
+            width: self.bounds.width * min(self.spendingProgress, 1),
             height: Self.trackHeight
         )
 
@@ -127,21 +129,54 @@ final class BudgetProgressView: UIView {
         self.periodMarkerView.center = CGPoint(x: markerX, y: self.bounds.midY)
     }
 
+    override func tintColorDidChange() {
+        super.tintColorDidChange()
+
+        self.updateFillColor()
+    }
+
     func configure(
         spendingProgress: Float,
         periodUnit: BudgetPeriodUnit,
-        tintColor: UIColor,
         date: Date = .now
     ) {
-        self.spendingProgress = min(max(CGFloat(spendingProgress), 0), 1)
+        // Retain values above 100% for pace and accessibility. Only the rendered
+        // fill is clipped to the end of the track in `layoutSubviews`.
+        self.spendingProgress = max(CGFloat(spendingProgress), 0)
         self.periodProgress = periodUnit.fractionElapsed(at: date)
-        self.fillView.backgroundColor = tintColor
+        self.updateFillColor()
 
         let spendingPercentage = Int((self.spendingProgress * 100).rounded())
         let periodPercentage = Int((self.periodProgress * 100).rounded())
         self.accessibilityLabel = "Budget progress"
-        self.accessibilityValue = "\(spendingPercentage) percent spent; \(periodPercentage) percent of the \(periodUnit.unitDescription) elapsed"
+        self.accessibilityValue = "\(spendingPercentage) percent spent; \(periodPercentage) percent of the \(periodUnit.unitDescription) elapsed; \(self.paceDescription)"
 
         self.setNeedsLayout()
+    }
+
+    private var paceDifference: CGFloat {
+        self.spendingProgress - self.periodProgress
+    }
+
+    private var paceDescription: String {
+        if self.paceDifference > Self.onPaceTolerance {
+            return "spending is ahead of pace"
+        }
+
+        if self.paceDifference < -Self.onPaceTolerance {
+            return "spending is behind pace"
+        }
+
+        return "spending is on pace"
+    }
+
+    private func updateFillColor() {
+        if self.paceDifference > Self.onPaceTolerance {
+            self.fillView.backgroundColor = .systemRed
+        } else if self.paceDifference < -Self.onPaceTolerance {
+            self.fillView.backgroundColor = .systemGreen
+        } else {
+            self.fillView.backgroundColor = self.tintColor
+        }
     }
 }

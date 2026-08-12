@@ -45,7 +45,7 @@ struct BudgetPreview: Hashable, Identifiable {
         }
 
         let ratio = NSDecimalNumber(decimal: self.spent / self.limit).floatValue
-        return min(max(ratio, 0), 1)
+        return max(ratio, 0)
     }
 
     var statusColor: UIColor {

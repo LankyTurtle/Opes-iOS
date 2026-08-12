@@ -249,9 +249,8 @@ private final class BudgetSummaryView: UIView {
         self.remainingLabel.textColor = remaining >= 0 ? .label : .systemRed
         self.spentLabel.text = "\(spent.formatted(.currency(code: "AUD"))) spent of \(limit.formatted(.currency(code: "AUD")))"
         self.progressView.configure(
-            spendingProgress: min(max(ratio, 0), 1),
-            periodUnit: .monthly,
-            tintColor: remaining >= 0 ? .systemTeal : .systemRed
+            spendingProgress: max(ratio, 0),
+            periodUnit: .monthly
         )
     }
 }
@@ -326,8 +325,7 @@ private final class BudgetCategoryRowView: UIView {
         self.statusLabel.textColor = budget.statusColor
         self.progressView.configure(
             spendingProgress: budget.progress,
-            periodUnit: budget.periodUnit,
-            tintColor: budget.statusColor
+            periodUnit: budget.periodUnit
         )
     }
 }

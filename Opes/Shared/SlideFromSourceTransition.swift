@@ -13,7 +13,7 @@ final class SlideFromSourceTransition: NSObject {
     /// The card covers a lot of ground and changes scale on the way, so it reads as
     /// abrupt at the duration a short system push uses. Damped high enough that the
     /// longer travel settles rather than wobbles at the end.
-    fileprivate static let duration: TimeInterval = 0.6
+    fileprivate static let duration: TimeInterval = 0.55
     fileprivate static let dampingRatio: CGFloat = 0.9
 
     private weak var sourceView: UIView?

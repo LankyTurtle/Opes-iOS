@@ -116,11 +116,18 @@ final class HomeViewController: TabRootViewController {
         self.customiseItem.isEnabled = false
 
         let transition = SlideFromSourceTransition(
-            sourceView: self.availableBalanceTile
-        ) { [weak self] in
-            self?.customiseItem.isEnabled = true
-            self?.accountSelectionTransition = nil
-        }
+            sourceView: self.availableBalanceTile,
+            onDismissalBegan: { [weak self] in
+                // UIKit keeps the active touch bound to the sheet's Done button,
+                // so Home can become ready as soon as dismissal starts.
+                self?.customiseItem.isEnabled = true
+            },
+            onDismissalCompleted: { [weak self] in
+                // The transitioning delegate is weak and must stay alive until the
+                // animator has formally completed.
+                self?.accountSelectionTransition = nil
+            }
+        )
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 

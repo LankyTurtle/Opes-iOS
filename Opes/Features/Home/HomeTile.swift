@@ -3,9 +3,8 @@ import Foundation
 /// A card on Home. Doubles as the diffable section and item identifier, since each
 /// tile is its own section and holds exactly one cell.
 enum HomeTile: String, CaseIterable, Hashable, Identifiable {
-    case balance
+    case availableBalance
     case budgets
-    case custom
     case recentTransactions
 
     var id: Self {
@@ -15,12 +14,10 @@ enum HomeTile: String, CaseIterable, Hashable, Identifiable {
     /// Shown in the customise list, where the tile has no content to identify it.
     var title: String {
         switch self {
-        case .balance:
+        case .availableBalance:
             return "Available Balance"
         case .budgets:
             return "Budgets"
-        case .custom:
-            return "Custom"
         case .recentTransactions:
             return "Recent Transactions"
         }
@@ -35,9 +32,21 @@ enum HomeTileOrder {
     /// removed one drops out rather than lingering as a dead identifier.
     static func load(from defaults: UserDefaults = .standard) -> [HomeTile] {
         let stored = (defaults.array(forKey: self.defaultsKey) as? [String] ?? [])
-            .compactMap(HomeTile.init(rawValue:))
+            .compactMap { rawValue in
+                // The custom tile is now the available-balance tile, retaining its
+                // position in existing customised Home layouts.
+                rawValue == "custom" ? .availableBalance : HomeTile(rawValue: rawValue)
+            }
 
-        return stored + HomeTile.allCases.filter { !stored.contains($0) }
+        let distinctStored = stored.reduce(into: [HomeTile]()) { tiles, tile in
+            guard !tiles.contains(tile) else {
+                return
+            }
+
+            tiles.append(tile)
+        }
+
+        return distinctStored + HomeTile.allCases.filter { !distinctStored.contains($0) }
     }
 
     static func save(_ order: [HomeTile], to defaults: UserDefaults = .standard) {

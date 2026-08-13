@@ -8,9 +8,8 @@ final class HomeViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
-    private let balanceTile = AvailableBalanceTileView()
+    private let availableBalanceTile = AvailableBalanceTileView()
     private let budgetsTile = BudgetsTileView()
-    private let customTile = AvailableBalanceTileView()
     private lazy var recentTile = RecentTransactionsTileView(
         transactions: Self.recentTransactions()
     )
@@ -46,18 +45,9 @@ final class HomeViewController: TabRootViewController {
         self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
 
-        self.balanceTile.addTarget(
+        self.availableBalanceTile.addTarget(
             self,
-            action: #selector(self.handleBalanceTileTap),
-            for: .touchUpInside
-        )
-
-        // Same tile, presented the other way, so the two transitions can be compared
-        // side by side.
-        self.customTile.headerTitle = HomeTile.custom.title
-        self.customTile.addTarget(
-            self,
-            action: #selector(self.handleCustomTileTap),
+            action: #selector(self.handleAvailableBalanceTileTap),
             for: .touchUpInside
         )
 
@@ -108,24 +98,12 @@ final class HomeViewController: TabRootViewController {
         self.present(Self.makeSheet(for: customise), animated: true)
     }
 
-    /// Native sheet: grabber and drag-to-dismiss, with the zoom transition growing
-    /// out of the tile.
-    @objc private func handleBalanceTileTap() {
-        let navigationController = Self.makeSheet(for: self.makeAccountSelection())
-
-        navigationController.preferredTransition = .zoom { [weak self] _ in
-            self?.balanceTile
-        }
-
-        self.present(navigationController, animated: true)
-    }
-
     /// Custom presentation: fixed-height card flying in right to left out of the
     /// tile, with a hand-drawn grabber because system sheet chrome is unavailable.
-    @objc private func handleCustomTileTap() {
-        let accountSelection = self.makeAccountSelection(usesCustomSheetToolbar: true)
+    @objc private func handleAvailableBalanceTileTap() {
+        let accountSelection = self.makeAccountSelection()
 
-        let transition = SlideFromSourceTransition(sourceView: self.customTile)
+        let transition = SlideFromSourceTransition(sourceView: self.availableBalanceTile)
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 
@@ -135,13 +113,10 @@ final class HomeViewController: TabRootViewController {
         self.present(accountSelection, animated: true)
     }
 
-    private func makeAccountSelection(
-        usesCustomSheetToolbar: Bool = false
-    ) -> AccountSelectionViewController {
+    private func makeAccountSelection() -> AccountSelectionViewController {
         AccountSelectionViewController(
             accounts: self.accounts,
-            selectedIDs: self.selectedAccountIDs,
-            usesCustomSheetToolbar: usesCustomSheetToolbar
+            selectedIDs: self.selectedAccountIDs
         ) { [weak self] selectedIDs in
             self?.selectedAccountIDs = selectedIDs
             self?.refreshTiles()
@@ -164,9 +139,8 @@ final class HomeViewController: TabRootViewController {
         let selected = self.accounts.filter { self.selectedAccountIDs.contains($0.id) }
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
-        self.balanceTile.show(balance: balance, accountCount: selected.count)
+        self.availableBalanceTile.show(balance: balance, accountCount: selected.count)
         self.budgetsTile.show(budgets: BudgetPreview.sample)
-        self.customTile.show(balance: balance, accountCount: selected.count)
     }
 
     /// One section per tile, so each draws as its own grouped card.
@@ -183,12 +157,10 @@ final class HomeViewController: TabRootViewController {
 
     private func tileView(for tile: HomeTile) -> UIView {
         switch tile {
-        case .balance:
-            return self.balanceTile
+        case .availableBalance:
+            return self.availableBalanceTile
         case .budgets:
             return self.budgetsTile
-        case .custom:
-            return self.customTile
         case .recentTransactions:
             return self.recentTile
         }

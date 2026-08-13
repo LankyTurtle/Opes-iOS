@@ -12,7 +12,6 @@ final class AccountSelectionViewController: UIViewController {
     private let accounts: [AccountPreview]
     private var selectedIDs: Set<AccountPreview.ID>
     private let onChange: (Set<AccountPreview.ID>) -> Void
-    private let usesCustomSheetToolbar: Bool
 
     private let titleLabel = UILabel()
     private let doneButton = UIButton(type: .system)
@@ -27,12 +26,10 @@ final class AccountSelectionViewController: UIViewController {
     init(
         accounts: [AccountPreview],
         selectedIDs: Set<AccountPreview.ID>,
-        usesCustomSheetToolbar: Bool = false,
         onChange: @escaping (Set<AccountPreview.ID>) -> Void
     ) {
         self.accounts = accounts
         self.selectedIDs = selectedIDs
-        self.usesCustomSheetToolbar = usesCustomSheetToolbar
         self.onChange = onChange
         super.init(nibName: nil, bundle: nil)
     }
@@ -47,16 +44,7 @@ final class AccountSelectionViewController: UIViewController {
 
         self.view.backgroundColor = .systemGroupedBackground
 
-        if self.usesCustomSheetToolbar {
-            self.configureCustomSheetToolbar()
-        } else {
-            self.title = Self.sheetTitle
-            self.navigationItem.rightBarButtonItem = UIBarButtonItem(
-                barButtonSystemItem: .done,
-                target: self,
-                action: #selector(self.handleDone)
-            )
-        }
+        self.configureCustomSheetToolbar()
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -69,7 +57,7 @@ final class AccountSelectionViewController: UIViewController {
         NSLayoutConstraint.activate([
             self.collectionView.topAnchor.constraint(
                 equalTo: self.view.topAnchor,
-                constant: self.usesCustomSheetToolbar ? DesignTokens.sheetToolbarHeight : 0
+                constant: DesignTokens.sheetToolbarHeight
             ),
             self.collectionView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             self.collectionView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),

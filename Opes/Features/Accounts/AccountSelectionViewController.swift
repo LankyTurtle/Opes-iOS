@@ -16,6 +16,8 @@ final class AccountSelectionViewController: UIViewController {
     private let titleLabel = UILabel()
     private let doneButton = UIButton(type: .system)
 
+    private var isDismissing = false
+
     private lazy var collectionView = UICollectionView(
         frame: .zero,
         collectionViewLayout: Self.makeLayout()
@@ -132,11 +134,13 @@ final class AccountSelectionViewController: UIViewController {
     }
 
     @objc private func handleDone() {
-        guard self.doneButton.isEnabled else {
+        // A flag rather than `isEnabled`, which would cross-fade the button to its
+        // disabled state while the card is still on screen flying out.
+        guard !self.isDismissing else {
             return
         }
 
-        self.doneButton.isEnabled = false
+        self.isDismissing = true
         self.dismiss(animated: true)
     }
 

@@ -17,16 +17,13 @@ final class SlideFromSourceTransition: NSObject {
     fileprivate static let dampingRatio: CGFloat = 0.9
 
     private weak var sourceView: UIView?
-    private let onDismissalBegan: (() -> Void)?
     private let onDismissalCompleted: (() -> Void)?
 
     init(
         sourceView: UIView,
-        onDismissalBegan: (() -> Void)? = nil,
         onDismissalCompleted: (() -> Void)? = nil
     ) {
         self.sourceView = sourceView
-        self.onDismissalBegan = onDismissalBegan
         self.onDismissalCompleted = onDismissalCompleted
         super.init()
     }
@@ -41,7 +38,6 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
         SlideFromSourcePresentationController(
             presentedViewController: presented,
             presenting: presenting,
-            onDismissalBegan: self.onDismissalBegan,
             onDismissalCompleted: self.onDismissalCompleted
         )
     }
@@ -65,7 +61,6 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
 final class SlideFromSourcePresentationController: UIPresentationController {
     private let dimmingView = UIView()
     private let grabberView = SheetGrabberView()
-    private let onDismissalBegan: (() -> Void)?
     private let onDismissalCompleted: (() -> Void)?
     private lazy var dismissPanGesture = UIPanGestureRecognizer(
         target: self,
@@ -78,10 +73,8 @@ final class SlideFromSourcePresentationController: UIPresentationController {
     init(
         presentedViewController: UIViewController,
         presenting presentingViewController: UIViewController?,
-        onDismissalBegan: (() -> Void)?,
         onDismissalCompleted: (() -> Void)?
     ) {
-        self.onDismissalBegan = onDismissalBegan
         self.onDismissalCompleted = onDismissalCompleted
         super.init(
             presentedViewController: presentedViewController,
@@ -146,8 +139,6 @@ final class SlideFromSourcePresentationController: UIPresentationController {
 
     override func dismissalTransitionWillBegin() {
         super.dismissalTransitionWillBegin()
-
-        self.onDismissalBegan?()
 
         _ = self.presentedViewController.transitionCoordinator?.animate { _ in
             self.dimmingView.alpha = 0

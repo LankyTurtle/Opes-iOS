@@ -87,6 +87,14 @@ final class HomeViewController: TabRootViewController {
     }
 
     @objc private func handleCustomiseTap() {
+        // The account card covers this button while it is on screen and on its way
+        // out. Refusing the action keeps the ellipsis inert for that whole window
+        // without disabling it — `isEnabled` cross-fades the button, which reads as
+        // the ellipsis animating the moment the card's Done button is pressed.
+        guard self.presentedViewController == nil, self.accountSelectionTransition == nil else {
+            return
+        }
+
         let customise = CustomiseHomeViewController(
             order: self.tileOrder
         ) { [weak self] order in
@@ -111,23 +119,14 @@ final class HomeViewController: TabRootViewController {
 
         let accountSelection = self.makeAccountSelection()
 
-        // The custom card begins over Home's navigation bar. Keep the underlying
-        // ellipsis inactive until its overlapping dismissal animation has ended.
-        self.customiseItem.isEnabled = false
-
         let transition = SlideFromSourceTransition(
-            sourceView: self.availableBalanceTile,
-            onDismissalBegan: { [weak self] in
-                // UIKit keeps the active touch bound to the sheet's Done button,
-                // so Home can become ready as soon as dismissal starts.
-                self?.customiseItem.isEnabled = true
-            },
-            onDismissalCompleted: { [weak self] in
-                // The transitioning delegate is weak and must stay alive until the
-                // animator has formally completed.
-                self?.accountSelectionTransition = nil
-            }
-        )
+            sourceView: self.availableBalanceTile
+        ) { [weak self] in
+            // The transitioning delegate is weak and must stay alive until the
+            // animator has formally completed. Holding it also marks the card as
+            // still on its way out, which `handleCustomiseTap` reads.
+            self?.accountSelectionTransition = nil
+        }
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 

@@ -132,6 +132,11 @@ final class AccountSelectionViewController: UIViewController {
     }
 
     @objc private func handleDone() {
+        guard self.doneButton.isEnabled else {
+            return
+        }
+
+        self.doneButton.isEnabled = false
         self.dismiss(animated: true)
     }
 

@@ -20,6 +20,17 @@ final class HomeViewController: TabRootViewController {
 
     private var accountSelectionTransition: SlideFromSourceTransition?
 
+    private lazy var customiseItem: UIBarButtonItem = {
+        let item = UIBarButtonItem(
+            image: UIImage(systemName: "ellipsis"),
+            style: .plain,
+            target: self,
+            action: #selector(self.handleCustomiseTap)
+        )
+        item.accessibilityLabel = "Customise Home"
+        return item
+    }()
+
     /// Defaults to the accounts holding money — debt would otherwise read as an
     /// "available balance" of hundreds of thousands in the negative.
     private lazy var selectedAccountIDs: Set<AccountPreview.ID> = Set(
@@ -31,14 +42,7 @@ final class HomeViewController: TabRootViewController {
 
         // A real bar button item, so the bar supplies its material, metrics and
         // press behaviour rather than this screen reproducing them.
-        let customiseItem = UIBarButtonItem(
-            image: UIImage(systemName: "ellipsis"),
-            style: .plain,
-            target: self,
-            action: #selector(self.handleCustomiseTap)
-        )
-        customiseItem.accessibilityLabel = "Customise Home"
-        self.navigationItem.rightBarButtonItem = customiseItem
+        self.navigationItem.rightBarButtonItem = self.customiseItem
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -101,9 +105,22 @@ final class HomeViewController: TabRootViewController {
     /// Custom presentation: fixed-height card flying in right to left out of the
     /// tile, with a hand-drawn grabber because system sheet chrome is unavailable.
     @objc private func handleAvailableBalanceTileTap() {
+        guard self.presentedViewController == nil else {
+            return
+        }
+
         let accountSelection = self.makeAccountSelection()
 
-        let transition = SlideFromSourceTransition(sourceView: self.availableBalanceTile)
+        // The custom card begins over Home's navigation bar. Keep the underlying
+        // ellipsis inactive until its overlapping dismissal animation has ended.
+        self.customiseItem.isEnabled = false
+
+        let transition = SlideFromSourceTransition(
+            sourceView: self.availableBalanceTile
+        ) { [weak self] in
+            self?.customiseItem.isEnabled = true
+            self?.accountSelectionTransition = nil
+        }
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.accountSelectionTransition = transition
 

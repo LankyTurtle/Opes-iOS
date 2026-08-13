@@ -17,9 +17,14 @@ final class SlideFromSourceTransition: NSObject {
     fileprivate static let dampingRatio: CGFloat = 0.9
 
     private weak var sourceView: UIView?
+    private let onDismissalCompleted: (() -> Void)?
 
-    init(sourceView: UIView) {
+    init(
+        sourceView: UIView,
+        onDismissalCompleted: (() -> Void)? = nil
+    ) {
         self.sourceView = sourceView
+        self.onDismissalCompleted = onDismissalCompleted
         super.init()
     }
 }
@@ -32,7 +37,8 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
     ) -> UIPresentationController? {
         SlideFromSourcePresentationController(
             presentedViewController: presented,
-            presenting: presenting
+            presenting: presenting,
+            onDismissalCompleted: self.onDismissalCompleted
         )
     }
 
@@ -55,12 +61,26 @@ extension SlideFromSourceTransition: UIViewControllerTransitioningDelegate {
 final class SlideFromSourcePresentationController: UIPresentationController {
     private let dimmingView = UIView()
     private let grabberView = SheetGrabberView()
+    private let onDismissalCompleted: (() -> Void)?
     private lazy var dismissPanGesture = UIPanGestureRecognizer(
         target: self,
         action: #selector(self.handleDismissPan(_:))
     )
 
     private var isCompletingPanDismissal = false
+    private var didNotifyDismissalCompletion = false
+
+    init(
+        presentedViewController: UIViewController,
+        presenting presentingViewController: UIViewController?,
+        onDismissalCompleted: (() -> Void)?
+    ) {
+        self.onDismissalCompleted = onDismissalCompleted
+        super.init(
+            presentedViewController: presentedViewController,
+            presenting: presentingViewController
+        )
+    }
 
     override var frameOfPresentedViewInContainerView: CGRect {
         guard let containerView = self.containerView else {
@@ -123,6 +143,17 @@ final class SlideFromSourcePresentationController: UIPresentationController {
         _ = self.presentedViewController.transitionCoordinator?.animate { _ in
             self.dimmingView.alpha = 0
         }
+    }
+
+    override func dismissalTransitionDidEnd(_ completed: Bool) {
+        super.dismissalTransitionDidEnd(completed)
+
+        guard completed, !self.didNotifyDismissalCompletion else {
+            return
+        }
+
+        self.didNotifyDismissalCompletion = true
+        self.onDismissalCompleted?()
     }
 
     override func containerViewWillLayoutSubviews() {

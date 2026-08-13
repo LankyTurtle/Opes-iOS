@@ -35,8 +35,11 @@ enum DesignTokens {
     /// A native large sheet begins at the top safe-area boundary.
     static let sheetTopInset: CGFloat = 0
 
-    /// Figma's full-screen iPhone sheet uses a 36 × 5 point grabber.
-    static let grabberSize = CGSize(width: 36, height: 5)
+    /// The newer of the two grabbers in Figma: wider and thinner than the 36 × 5 one
+    /// the full-screen iPhone sheet still carries. Exposed there as `grabber-width`
+    /// and `grabber-height`, so these are Apple's own named values rather than
+    /// anything measured off a render.
+    static let grabberSize = CGSize(width: 58, height: 4)
 
     /// Drop from a card's top edge to its grabber.
     static let grabberTopInset: CGFloat = 5

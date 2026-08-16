@@ -6,6 +6,7 @@ final class PayCycleTrackerTileView: UIControl {
     private let headerLabel = UILabel()
     private let rowsStack = UIStackView()
     private let emptyLabel = UILabel()
+    private let addButton = UIButton(type: .system)
     private let calculator = NextPayDateCalculator()
 
     override init(frame: CGRect) {
@@ -24,7 +25,15 @@ final class PayCycleTrackerTileView: UIControl {
         self.emptyLabel.numberOfLines = 0
         self.emptyLabel.text = "Add a pay cycle to see your next pay day."
 
-        let stack = UIStackView(arrangedSubviews: [self.headerLabel, self.rowsStack, self.emptyLabel])
+        var buttonConfiguration = UIButton.Configuration.tinted()
+        buttonConfiguration.title = "Add Pay Cycle"
+        buttonConfiguration.image = UIImage(systemName: "plus")
+        buttonConfiguration.imagePadding = 6
+        self.addButton.configuration = buttonConfiguration
+        self.addButton.contentHorizontalAlignment = .leading
+        self.addButton.addTarget(self, action: #selector(self.handleAddTap), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [self.headerLabel, self.rowsStack, self.emptyLabel, self.addButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
         stack.spacing = DesignTokens.titleSpacing
@@ -66,6 +75,7 @@ final class PayCycleTrackerTileView: UIControl {
             .prefix(3)
 
         self.emptyLabel.isHidden = !upcoming.isEmpty
+        self.addButton.isHidden = !upcoming.isEmpty
         guard !upcoming.isEmpty else {
             self.accessibilityLabel = "Pay Cycles. Add a pay cycle to see your next pay day."
             self.accessibilityHint = "Open pay cycle management"
@@ -80,6 +90,10 @@ final class PayCycleTrackerTileView: UIControl {
             .joined(separator: ". ")
         self.accessibilityLabel = "Pay Cycles. \(summary)"
         self.accessibilityHint = "Open pay cycle management"
+    }
+
+    @objc private func handleAddTap() {
+        self.sendActions(for: .touchUpInside)
     }
 
     private static func makeRow(cycle: PayCycle, display: PayCycleDateDisplay) -> UIView {

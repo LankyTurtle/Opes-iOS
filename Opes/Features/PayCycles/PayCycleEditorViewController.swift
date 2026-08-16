@@ -8,6 +8,8 @@ final class PayCycleEditorViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private let nameField = UITextField()
+    private let amountField = UITextField()
+    private let transactionButton = UIButton(type: .system)
     private let frequencyControl = UISegmentedControl(items: PayFrequency.allCases.map(\.title))
     private let ruleControl = UISegmentedControl(items: ["First", "Last", "Specific"])
     private let weekdayButton = UIButton(type: .system)
@@ -22,8 +24,10 @@ final class PayCycleEditorViewController: UIViewController {
     private var adjustment: BusinessDayAdjustment
     private var state: AustralianStateOrTerritory
     private var weekday: Int
+    private var linkedTransactionID: Transaction.ID?
+    private let transactions: [Transaction]
 
-    init(cycle: PayCycle?, onSave: @escaping (PayCycle) -> Void) {
+    init(cycle: PayCycle?, transactions: [Transaction], onSave: @escaping (PayCycle) -> Void) {
         self.existingCycle = cycle
         self.onSave = onSave
         self.frequency = cycle?.frequency ?? .monthly
@@ -31,6 +35,8 @@ final class PayCycleEditorViewController: UIViewController {
         self.adjustment = cycle?.businessDayAdjustment ?? .none
         self.state = cycle?.stateOrTerritory ?? .newSouthWales
         self.weekday = cycle?.rule.weekday ?? Calendar.autoupdatingCurrent.firstWeekday
+        self.linkedTransactionID = cycle?.linkedTransactionID
+        self.transactions = transactions
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -82,6 +88,14 @@ final class PayCycleEditorViewController: UIViewController {
         self.nameField.borderStyle = .roundedRect
         self.nameField.autocapitalizationType = .words
 
+        self.amountField.placeholder = "0.00"
+        self.amountField.text = self.existingCycle?.amount.formatted(.number.precision(.fractionLength(2)))
+        self.amountField.borderStyle = .roundedRect
+        self.amountField.keyboardType = .decimalPad
+        self.amountField.addTarget(self, action: #selector(self.previewChanged), for: .editingChanged)
+
+        self.configureTransactionButton()
+
         self.frequencyControl.selectedSegmentIndex = PayFrequency.allCases.firstIndex(of: self.frequency) ?? 2
         self.frequencyControl.addTarget(self, action: #selector(self.frequencyChanged), for: .valueChanged)
 
@@ -118,6 +132,8 @@ final class PayCycleEditorViewController: UIViewController {
             $0.removeFromSuperview()
         }
         self.stack.addArrangedSubview(self.makeField(title: "Name", control: self.nameField))
+        self.stack.addArrangedSubview(self.makeField(title: "Pay amount (AUD)", control: self.amountField))
+        self.stack.addArrangedSubview(self.makeField(title: "Linked transaction", control: self.transactionButton))
         self.stack.addArrangedSubview(self.makeField(title: "Frequency", control: self.frequencyControl))
 
         if self.frequency != .daily {
@@ -182,6 +198,28 @@ final class PayCycleEditorViewController: UIViewController {
         self.stateButton.contentHorizontalAlignment = .leading
     }
 
+    private func configureTransactionButton() {
+        let selected = self.transactions.first { $0.id == self.linkedTransactionID }
+        self.transactionButton.showsMenuAsPrimaryAction = true
+        self.transactionButton.contentHorizontalAlignment = .leading
+        self.transactionButton.menu = UIMenu(children: [
+            UIAction(title: "No linked transaction", state: selected == nil ? .on : .off) { [weak self] _ in
+                self?.linkedTransactionID = nil
+                self?.refreshForm()
+            },
+        ] + self.transactions.sorted { $0.date > $1.date }.map { transaction in
+            let title = "\(transaction.merchant) · \(transaction.formattedAmount) · \(transaction.formattedDate)"
+            return UIAction(title: title, state: transaction.id == self.linkedTransactionID ? .on : .off) { [weak self] _ in
+                self?.linkedTransactionID = transaction.id
+                self?.refreshForm()
+            }
+        })
+        self.transactionButton.setTitle(
+            selected.map { "\($0.merchant) · \($0.formattedAmount)" } ?? "No linked transaction",
+            for: .normal
+        )
+    }
+
     private func updatePreview() {
         let cycle = self.makeCycle(name: self.nameField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Pay")
         guard let display = self.calculator.display(for: cycle) else {
@@ -211,6 +249,8 @@ final class PayCycleEditorViewController: UIViewController {
         return PayCycle(
             id: self.existingCycle?.id ?? UUID(),
             name: name,
+            amount: self.amount(),
+            linkedTransactionID: self.linkedTransactionID,
             frequency: self.frequency,
             rule: rule,
             businessDayAdjustment: self.adjustment,
@@ -253,11 +293,22 @@ final class PayCycleEditorViewController: UIViewController {
             self.present(alert, animated: true)
             return
         }
+        guard self.amount() > 0 else {
+            let alert = UIAlertController(title: "Amount required", message: "Enter a pay amount greater than zero.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            self.present(alert, animated: true)
+            return
+        }
         self.onSave(self.makeCycle(name: name))
         self.navigationController?.popViewController(animated: true)
     }
 
     private static func weekdayName(_ weekday: Int) -> String {
         Calendar.autoupdatingCurrent.weekdaySymbols[weekday - 1]
+    }
+
+    private func amount() -> Decimal {
+        let input = self.amountField.text?.replacingOccurrences(of: ",", with: "") ?? ""
+        return Decimal(string: input, locale: Locale(identifier: "en_AU")) ?? 0
     }
 }

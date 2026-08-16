@@ -19,6 +19,7 @@ final class HomeViewController: TabRootViewController {
 
     private let accounts = AccountPreview.sample
     private let payCycleStore = PayCycleStore.shared
+    private let transactionProvider: any TransactionProviding = SampleTransactionProvider()
 
     private var accountSelectionTransition: SlideFromSourceTransition?
 
@@ -148,7 +149,10 @@ final class HomeViewController: TabRootViewController {
             return
         }
 
-        let payCycles = PayCyclesViewController(store: self.payCycleStore) { [weak self] in
+        let payCycles = PayCyclesViewController(
+            store: self.payCycleStore,
+            transactionProvider: self.transactionProvider
+        ) { [weak self] in
             self?.refreshTiles()
         }
         self.present(Self.makeSheet(for: payCycles), animated: true)
@@ -181,7 +185,10 @@ final class HomeViewController: TabRootViewController {
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
         self.availableBalanceTile.show(balance: balance, accountCount: selected.count)
-        self.payCycleTrackerTile.show(cycles: self.payCycleStore.load())
+        self.payCycleTrackerTile.show(
+            cycles: self.payCycleStore.load(),
+            transactions: self.transactionProvider.transactions()
+        )
         self.budgetsTile.show(budgets: BudgetPreview.sample)
     }
 

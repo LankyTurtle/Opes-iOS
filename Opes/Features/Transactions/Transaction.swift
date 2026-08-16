@@ -16,6 +16,18 @@ struct Transaction: Hashable, Identifiable {
     }
 }
 
+/// Pay cycles depend on this small read interface instead of a particular local
+/// store. A backend implementation can replace the sample provider later.
+protocol TransactionProviding {
+    func transactions() -> [Transaction]
+}
+
+struct SampleTransactionProvider: TransactionProviding {
+    func transactions() -> [Transaction] {
+        Transaction.sample
+    }
+}
+
 extension Transaction {
     /// Local sample data, until transactions come from a real store.
     static let sample: [Transaction] = [
@@ -48,7 +60,9 @@ extension Transaction {
 
     private static func makeSample(merchant: String, cents: Int, hoursAgo: Int) -> Transaction {
         Transaction(
-            id: UUID(),
+            // Stable sample IDs keep a locally saved pay-cycle link valid across
+            // app launches until a backend supplies real transaction IDs.
+            id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012X", hoursAgo))!,
             merchant: merchant,
             date: Date(timeIntervalSinceNow: -Double(hoursAgo) * 3_600),
             // Built from whole cents so the sample amounts stay exact.

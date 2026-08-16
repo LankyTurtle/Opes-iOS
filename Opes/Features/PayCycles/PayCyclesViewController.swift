@@ -2,12 +2,19 @@ import UIKit
 
 final class PayCyclesViewController: UITableViewController {
     private let store: PayCycleStore
+    private let transactionProvider: any TransactionProviding
     private let onChange: () -> Void
     private let calculator = NextPayDateCalculator()
     private var cycles: [PayCycle] = []
+    private var transactions: [Transaction] = []
 
-    init(store: PayCycleStore, onChange: @escaping () -> Void) {
+    init(
+        store: PayCycleStore,
+        transactionProvider: any TransactionProviding = SampleTransactionProvider(),
+        onChange: @escaping () -> Void
+    ) {
         self.store = store
+        self.transactionProvider = transactionProvider
         self.onChange = onChange
         super.init(style: .insetGrouped)
     }
@@ -39,6 +46,7 @@ final class PayCyclesViewController: UITableViewController {
     }
 
     private func reload() {
+        self.transactions = self.transactionProvider.transactions()
         self.cycles = self.store.load().sorted { lhs, rhs in
             let left = self.calculator.nextPayDate(for: lhs) ?? .distantFuture
             let right = self.calculator.nextPayDate(for: rhs) ?? .distantFuture
@@ -49,7 +57,7 @@ final class PayCyclesViewController: UITableViewController {
     }
 
     private func showEditor(for cycle: PayCycle?) {
-        let editor = PayCycleEditorViewController(cycle: cycle) { [weak self] saved in
+        let editor = PayCycleEditorViewController(cycle: cycle, transactions: self.transactions) { [weak self] saved in
             guard let self else { return }
             self.store.upsert(saved)
             self.onChange()
@@ -69,12 +77,18 @@ final class PayCyclesViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: "PayCycleCell", for: indexPath)
         var content = cell.defaultContentConfiguration()
         content.text = cycle.name
+        let linkedTransaction = self.transactions.first { $0.id == cycle.linkedTransactionID }
         if let display = self.calculator.display(for: cycle) {
             let date = display.date.formatted(date: .abbreviated, time: .omitted)
-            content.secondaryText = cycle.isEnabled ? "\(display.countdown) · \(date)" : "Disabled · \(date)"
+            let amount = cycle.amount.formatted(.currency(code: "AUD"))
+            let schedule = cycle.isEnabled
+                ? "\(amount) · \(display.countdown) · \(date)"
+                : "Disabled · \(amount) · \(date)"
+            content.secondaryText = linkedTransaction.map { "\(schedule)\nLinked: \($0.merchant) · \($0.formattedAmount)" } ?? schedule
         } else {
             content.secondaryText = "No upcoming pay date"
         }
+        content.secondaryTextProperties.numberOfLines = 2
         cell.contentConfiguration = content
         cell.accessoryType = .disclosureIndicator
         return cell

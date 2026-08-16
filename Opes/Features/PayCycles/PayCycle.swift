@@ -5,6 +5,11 @@ import Foundation
 struct PayCycle: Codable, Hashable, Identifiable {
     var id: UUID
     var name: String
+    /// Expected amount for one occurrence of this cycle.
+    var amount: Decimal
+    /// The transaction that the user associates with this cycle, if available.
+    /// It is a stable backend-friendly identifier rather than embedded data.
+    var linkedTransactionID: Transaction.ID?
     var frequency: PayFrequency
     var rule: PayDateRule
     var businessDayAdjustment: BusinessDayAdjustment
@@ -14,6 +19,8 @@ struct PayCycle: Codable, Hashable, Identifiable {
     init(
         id: UUID = UUID(),
         name: String,
+        amount: Decimal = 0,
+        linkedTransactionID: Transaction.ID? = nil,
         frequency: PayFrequency,
         rule: PayDateRule = .firstDay,
         businessDayAdjustment: BusinessDayAdjustment = .none,
@@ -22,11 +29,32 @@ struct PayCycle: Codable, Hashable, Identifiable {
     ) {
         self.id = id
         self.name = name
+        self.amount = amount
+        self.linkedTransactionID = linkedTransactionID
         self.frequency = frequency
         self.rule = rule
         self.businessDayAdjustment = businessDayAdjustment
         self.stateOrTerritory = stateOrTerritory
         self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, amount, linkedTransactionID, frequency, rule, businessDayAdjustment, stateOrTerritory, isEnabled
+    }
+
+    /// Cycles saved before amount tracking was introduced remain usable; the
+    /// editor asks for an amount when the user next saves one.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.amount = try container.decodeIfPresent(Decimal.self, forKey: .amount) ?? 0
+        self.linkedTransactionID = try container.decodeIfPresent(Transaction.ID.self, forKey: .linkedTransactionID)
+        self.frequency = try container.decode(PayFrequency.self, forKey: .frequency)
+        self.rule = try container.decode(PayDateRule.self, forKey: .rule)
+        self.businessDayAdjustment = try container.decode(BusinessDayAdjustment.self, forKey: .businessDayAdjustment)
+        self.stateOrTerritory = try container.decode(AustralianStateOrTerritory.self, forKey: .stateOrTerritory)
+        self.isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
     }
 }
 

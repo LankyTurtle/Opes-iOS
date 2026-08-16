@@ -59,7 +59,7 @@ final class PayCycleTrackerTileView: UIControl {
         didSet { self.alpha = self.isHighlighted ? 0.6 : 1 }
     }
 
-    func show(cycles: [PayCycle], from date: Date = .now) {
+    func show(cycles: [PayCycle], transactions: [Transaction], from date: Date = .now) {
         self.rowsStack.arrangedSubviews.forEach {
             self.rowsStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
@@ -83,10 +83,16 @@ final class PayCycleTrackerTileView: UIControl {
         }
 
         for (cycle, display) in upcoming {
-            self.rowsStack.addArrangedSubview(Self.makeRow(cycle: cycle, display: display))
+            let linkedTransaction = transactions.first { $0.id == cycle.linkedTransactionID }
+            self.rowsStack.addArrangedSubview(Self.makeRow(cycle: cycle, display: display, linkedTransaction: linkedTransaction))
         }
 
-        let summary = upcoming.map { "\($0.0.name), \($0.1.countdown), \($0.1.date.formatted(date: .abbreviated, time: .omitted))" }
+        let summary = upcoming.map { cycle, display in
+            let amount = cycle.amount.formatted(.currency(code: "AUD"))
+            let linked = transactions.first { $0.id == cycle.linkedTransactionID }
+            let linkedDescription = linked.map { ", linked transaction \($0.merchant), \($0.formattedAmount)" } ?? ""
+            return "\(cycle.name), \(amount), \(display.countdown), \(display.date.formatted(date: .abbreviated, time: .omitted))\(linkedDescription)"
+        }
             .joined(separator: ". ")
         self.accessibilityLabel = "Pay Cycles. \(summary)"
         self.accessibilityHint = "Open pay cycle management"
@@ -96,34 +102,45 @@ final class PayCycleTrackerTileView: UIControl {
         self.sendActions(for: .touchUpInside)
     }
 
-    private static func makeRow(cycle: PayCycle, display: PayCycleDateDisplay) -> UIView {
+    private static func makeRow(
+        cycle: PayCycle,
+        display: PayCycleDateDisplay,
+        linkedTransaction: Transaction?
+    ) -> UIView {
         let name = UILabel()
         name.font = .preferredFont(forTextStyle: .body)
         name.adjustsFontForContentSizeCategory = true
         name.text = cycle.name
         name.numberOfLines = 1
 
-        let countdown = UILabel()
-        countdown.font = .preferredFont(forTextStyle: .subheadline)
-        countdown.adjustsFontForContentSizeCategory = true
-        countdown.textColor = .secondaryLabel
-        countdown.textAlignment = .right
-        countdown.text = display.countdown
-        countdown.setContentHuggingPriority(.required, for: .horizontal)
+        let amount = UILabel()
+        amount.font = .preferredFont(forTextStyle: .body)
+        amount.adjustsFontForContentSizeCategory = true
+        amount.textAlignment = .right
+        amount.text = cycle.amount.formatted(.currency(code: "AUD"))
+        amount.setContentHuggingPriority(.required, for: .horizontal)
 
         let date = UILabel()
         date.font = .preferredFont(forTextStyle: .footnote)
         date.adjustsFontForContentSizeCategory = true
         date.textColor = .secondaryLabel
-        date.text = display.date.formatted(date: .abbreviated, time: .omitted)
+        date.text = "\(display.countdown) · \(display.date.formatted(date: .abbreviated, time: .omitted))"
 
-        let titleRow = UIStackView(arrangedSubviews: [name, countdown])
+        let titleRow = UIStackView(arrangedSubviews: [name, amount])
         titleRow.axis = .horizontal
         titleRow.spacing = 12
 
         let row = UIStackView(arrangedSubviews: [titleRow, date])
         row.axis = .vertical
         row.spacing = 2
+        if let linkedTransaction {
+            let linked = UILabel()
+            linked.font = .preferredFont(forTextStyle: .footnote)
+            linked.adjustsFontForContentSizeCategory = true
+            linked.textColor = .tertiaryLabel
+            linked.text = "Linked: \(linkedTransaction.merchant) · \(linkedTransaction.formattedAmount)"
+            row.addArrangedSubview(linked)
+        }
         row.isAccessibilityElement = false
         return row
     }

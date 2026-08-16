@@ -4,6 +4,7 @@ import Foundation
 /// tile is its own section and holds exactly one cell.
 enum HomeTile: String, CaseIterable, Hashable, Identifiable {
     case availableBalance
+    case payCycleTracker
     case budgets
     case recentTransactions
 
@@ -16,6 +17,8 @@ enum HomeTile: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .availableBalance:
             return "Available Balance"
+        case .payCycleTracker:
+            return "Pay Cycles"
         case .budgets:
             return "Budgets"
         case .recentTransactions:

@@ -9,6 +9,7 @@ final class HomeViewController: TabRootViewController {
     private lazy var dataSource = self.makeDataSource()
 
     private let availableBalanceTile = AvailableBalanceTileView()
+    private let payCycleTrackerTile = PayCycleTrackerTileView()
     private let budgetsTile = BudgetsTileView()
     private lazy var recentTile = RecentTransactionsTileView(
         transactions: Self.recentTransactions()
@@ -17,6 +18,7 @@ final class HomeViewController: TabRootViewController {
     private var tileOrder = HomeTileOrder.load()
 
     private let accounts = AccountPreview.sample
+    private let payCycleStore = PayCycleStore.shared
 
     private var accountSelectionTransition: SlideFromSourceTransition?
 
@@ -52,6 +54,11 @@ final class HomeViewController: TabRootViewController {
         self.availableBalanceTile.addTarget(
             self,
             action: #selector(self.handleAvailableBalanceTileTap),
+            for: .touchUpInside
+        )
+        self.payCycleTrackerTile.addTarget(
+            self,
+            action: #selector(self.handlePayCycleTrackerTap),
             for: .touchUpInside
         )
 
@@ -136,6 +143,17 @@ final class HomeViewController: TabRootViewController {
         self.present(accountSelection, animated: true)
     }
 
+    @objc private func handlePayCycleTrackerTap() {
+        guard self.presentedViewController == nil else {
+            return
+        }
+
+        let payCycles = PayCyclesViewController(store: self.payCycleStore) { [weak self] in
+            self?.refreshTiles()
+        }
+        self.present(Self.makeSheet(for: payCycles), animated: true)
+    }
+
     private func makeAccountSelection() -> AccountSelectionViewController {
         AccountSelectionViewController(
             accounts: self.accounts,
@@ -163,6 +181,7 @@ final class HomeViewController: TabRootViewController {
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
         self.availableBalanceTile.show(balance: balance, accountCount: selected.count)
+        self.payCycleTrackerTile.show(cycles: self.payCycleStore.load())
         self.budgetsTile.show(budgets: BudgetPreview.sample)
     }
 
@@ -182,6 +201,8 @@ final class HomeViewController: TabRootViewController {
         switch tile {
         case .availableBalance:
             return self.availableBalanceTile
+        case .payCycleTracker:
+            return self.payCycleTrackerTile
         case .budgets:
             return self.budgetsTile
         case .recentTransactions:

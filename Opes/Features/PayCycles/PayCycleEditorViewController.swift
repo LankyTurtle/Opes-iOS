@@ -12,7 +12,9 @@ final class PayCycleEditorViewController: UIViewController {
     private let transactionButton = UIButton(type: .system)
     private let frequencyControl = UISegmentedControl(items: PayFrequency.allCases.map(\.title))
     private let ruleControl = UISegmentedControl(items: ["First", "Last", "Specific"])
-    private let weekdayButton = UIButton(type: .system)
+    private let weekdayControl = UISegmentedControl(
+        items: Calendar.autoupdatingCurrent.shortWeekdaySymbols
+    )
     private let datePicker = UIDatePicker()
     private let adjustmentControl = UISegmentedControl(items: ["Exact", "Back", "Forward"])
     private let stateButton = UIButton(type: .system)
@@ -97,14 +99,37 @@ final class PayCycleEditorViewController: UIViewController {
         self.configureTransactionButton()
 
         self.frequencyControl.selectedSegmentIndex = PayFrequency.allCases.firstIndex(of: self.frequency) ?? 2
-        self.frequencyControl.addTarget(self, action: #selector(self.frequencyChanged), for: .valueChanged)
+        self.frequencyControl.addAction(
+            UIAction { [weak self] _ in
+                self?.frequencyChanged()
+            },
+            for: .valueChanged
+        )
 
         self.ruleControl.selectedSegmentIndex = switch self.rule.kind {
         case .firstDay: 0
         case .lastDay: 1
         case .specific: 2
         }
-        self.ruleControl.addTarget(self, action: #selector(self.ruleChanged), for: .valueChanged)
+        self.ruleControl.addAction(
+            UIAction { [weak self] _ in
+                self?.ruleChanged()
+            },
+            for: .valueChanged
+        )
+
+        self.weekdayControl.selectedSegmentIndex = max(min(self.weekday - 1, 6), 0)
+        self.weekdayControl.addAction(
+            UIAction { [weak self] _ in
+                guard let self else {
+                    return
+                }
+
+                self.weekday = self.weekdayControl.selectedSegmentIndex + 1
+                self.updatePreview()
+            },
+            for: .valueChanged
+        )
 
         self.datePicker.datePickerMode = .date
         self.datePicker.preferredDatePickerStyle = .compact
@@ -116,7 +141,12 @@ final class PayCycleEditorViewController: UIViewController {
         }
 
         self.adjustmentControl.selectedSegmentIndex = BusinessDayAdjustment.allCases.firstIndex(of: self.adjustment) ?? 0
-        self.adjustmentControl.addTarget(self, action: #selector(self.adjustmentChanged), for: .valueChanged)
+        self.adjustmentControl.addAction(
+            UIAction { [weak self] _ in
+                self?.adjustmentChanged()
+            },
+            for: .valueChanged
+        )
         self.enabledSwitch.isOn = self.existingCycle?.isEnabled ?? true
         self.enabledSwitch.addTarget(self, action: #selector(self.previewChanged), for: .valueChanged)
 
@@ -141,8 +171,7 @@ final class PayCycleEditorViewController: UIViewController {
             if self.ruleControl.selectedSegmentIndex == 2 {
                 switch self.frequency {
                 case .weekly:
-                    self.configureWeekdayButton()
-                    self.stack.addArrangedSubview(self.makeField(title: "Weekday", control: self.weekdayButton))
+                    self.stack.addArrangedSubview(self.makeField(title: "Weekday", control: self.weekdayControl))
                 case .monthly:
                     self.stack.addArrangedSubview(self.makeField(title: "Day of month", control: self.datePicker))
                 case .yearly:
@@ -172,18 +201,6 @@ final class PayCycleEditorViewController: UIViewController {
         stack.axis = .vertical
         stack.spacing = 6
         return stack
-    }
-
-    private func configureWeekdayButton() {
-        self.weekdayButton.showsMenuAsPrimaryAction = true
-        self.weekdayButton.menu = UIMenu(children: (1...7).map { weekday in
-            UIAction(title: Self.weekdayName(weekday), state: weekday == self.weekday ? .on : .off) { [weak self] _ in
-                self?.weekday = weekday
-                self?.refreshForm()
-            }
-        })
-        self.weekdayButton.setTitle(Self.weekdayName(self.weekday), for: .normal)
-        self.weekdayButton.contentHorizontalAlignment = .leading
     }
 
     private func configureStateButton() {
@@ -263,12 +280,12 @@ final class PayCycleEditorViewController: UIViewController {
         self.ruleControl.selectedSegmentIndex == 1 ? .lastDay : .firstDay
     }
 
-    @objc private func frequencyChanged() {
+    private func frequencyChanged() {
         self.frequency = PayFrequency.allCases[self.frequencyControl.selectedSegmentIndex]
         self.refreshForm()
     }
 
-    @objc private func ruleChanged() {
+    private func ruleChanged() {
         self.refreshForm()
     }
 
@@ -276,7 +293,7 @@ final class PayCycleEditorViewController: UIViewController {
         self.updatePreview()
     }
 
-    @objc private func adjustmentChanged() {
+    private func adjustmentChanged() {
         self.adjustment = BusinessDayAdjustment.allCases[self.adjustmentControl.selectedSegmentIndex]
         self.refreshForm()
     }
@@ -301,10 +318,6 @@ final class PayCycleEditorViewController: UIViewController {
         }
         self.onSave(self.makeCycle(name: name))
         self.navigationController?.popViewController(animated: true)
-    }
-
-    private static func weekdayName(_ weekday: Int) -> String {
-        Calendar.autoupdatingCurrent.weekdaySymbols[weekday - 1]
     }
 
     private func amount() -> Decimal {

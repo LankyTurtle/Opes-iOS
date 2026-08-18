@@ -1,12 +1,13 @@
 import UIKit
 
-final class PayCycleEditorViewController: UIViewController {
+/// The pay cycle form, laid out as an inset-grouped list so each control sits in a
+/// system row — a borderless text field against the trailing edge, a section header
+/// for its label — rather than in hand-built boxes stacked down the screen.
+final class PayCycleEditorViewController: UITableViewController {
     private let existingCycle: PayCycle?
     private let onSave: (PayCycle) -> Void
     private let calculator = NextPayDateCalculator()
 
-    private let scrollView = UIScrollView()
-    private let stack = UIStackView()
     private let nameField = UITextField()
     private let amountField = UITextField()
     private let transactionButton = UIButton(type: .system)
@@ -19,7 +20,46 @@ final class PayCycleEditorViewController: UIViewController {
     private let adjustmentControl = UISegmentedControl(items: ["Exact", "Back", "Forward"])
     private let stateButton = UIButton(type: .system)
     private let enabledSwitch = UISwitch()
-    private let previewLabel = UILabel()
+
+    // The rows are built once and rearranged as the form changes, rather than
+    // dequeued, so every control keeps its state — and its first responder — while
+    // the sections around it come and go.
+    private lazy var nameRow = FormRowCell(
+        title: "Name",
+        control: self.nameField,
+        stretchesControl: true
+    )
+    private lazy var amountRow = FormRowCell(
+        title: "Amount (AUD)",
+        control: self.amountField,
+        stretchesControl: true
+    )
+    private lazy var transactionRow = FormRowCell(
+        title: "Linked transaction",
+        control: self.transactionButton,
+        stretchesControl: true
+    )
+    private lazy var frequencyRow = FormRowCell(control: self.frequencyControl)
+    private lazy var ruleRow = FormRowCell(control: self.ruleControl)
+    private lazy var weekdayRow = FormRowCell(control: self.weekdayControl)
+    private lazy var dateRow = FormRowCell(
+        title: "Day of month",
+        control: self.datePicker,
+        stretchesControl: false
+    )
+    private lazy var adjustmentRow = FormRowCell(control: self.adjustmentControl)
+    private lazy var stateRow = FormRowCell(
+        title: "Public holiday calendar",
+        control: self.stateButton,
+        stretchesControl: true
+    )
+    private lazy var enabledRow = FormRowCell(
+        title: "Enabled",
+        control: self.enabledSwitch,
+        stretchesControl: false
+    )
+
+    private var sections: [FormSection] = []
 
     private var frequency: PayFrequency
     private var rule: PayDateRule
@@ -39,7 +79,7 @@ final class PayCycleEditorViewController: UIViewController {
         self.weekday = cycle?.rule.weekday ?? Calendar.autoupdatingCurrent.firstWeekday
         self.linkedTransactionID = cycle?.linkedTransactionID
         self.transactions = transactions
-        super.init(nibName: nil, bundle: nil)
+        super.init(style: .insetGrouped)
     }
 
     @available(*, unavailable)
@@ -50,53 +90,44 @@ final class PayCycleEditorViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.title = self.existingCycle == nil ? "Add Pay Cycle" : "Edit Pay Cycle"
-        self.view.backgroundColor = .systemGroupedBackground
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .save,
             target: self,
             action: #selector(self.save)
         )
+        self.tableView.keyboardDismissMode = .interactive
 
-        self.configureLayout()
         self.configureControls()
         self.refreshForm()
     }
 
-    private func configureLayout() {
-        self.scrollView.translatesAutoresizingMaskIntoConstraints = false
-        self.stack.translatesAutoresizingMaskIntoConstraints = false
-        self.stack.axis = .vertical
-        self.stack.spacing = 20
-        self.stack.isLayoutMarginsRelativeArrangement = true
-        self.stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 20, leading: 20, bottom: 32, trailing: 20)
-        self.view.addSubview(self.scrollView)
-        self.scrollView.addSubview(self.stack)
-
-        NSLayoutConstraint.activate([
-            self.scrollView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
-            self.scrollView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            self.scrollView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            self.scrollView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
-            self.stack.topAnchor.constraint(equalTo: self.scrollView.contentLayoutGuide.topAnchor),
-            self.stack.leadingAnchor.constraint(equalTo: self.scrollView.frameLayoutGuide.leadingAnchor),
-            self.stack.trailingAnchor.constraint(equalTo: self.scrollView.frameLayoutGuide.trailingAnchor),
-            self.stack.bottomAnchor.constraint(equalTo: self.scrollView.contentLayoutGuide.bottomAnchor),
-        ])
-    }
-
     private func configureControls() {
-        self.nameField.placeholder = "For example, Salary"
+        // Borderless, because the row supplies the chrome a rounded-rect field would
+        // otherwise draw inside it.
+        self.nameField.borderStyle = .none
+        self.nameField.placeholder = "Salary"
         self.nameField.text = self.existingCycle?.name
-        self.nameField.borderStyle = .roundedRect
+        self.nameField.textAlignment = .right
+        self.nameField.font = .preferredFont(forTextStyle: .body)
+        self.nameField.adjustsFontForContentSizeCategory = true
         self.nameField.autocapitalizationType = .words
+        self.nameField.clearButtonMode = .whileEditing
+        self.nameField.returnKeyType = .done
+        self.nameField.delegate = self
+        self.nameField.accessibilityLabel = "Name"
 
+        self.amountField.borderStyle = .none
         self.amountField.placeholder = "0.00"
         self.amountField.text = self.existingCycle?.amount.formatted(.number.precision(.fractionLength(2)))
-        self.amountField.borderStyle = .roundedRect
+        self.amountField.textAlignment = .right
+        self.amountField.font = .preferredFont(forTextStyle: .body)
+        self.amountField.adjustsFontForContentSizeCategory = true
         self.amountField.keyboardType = .decimalPad
-        self.amountField.addTarget(self, action: #selector(self.previewChanged), for: .editingChanged)
+        self.amountField.clearButtonMode = .whileEditing
+        self.amountField.accessibilityLabel = "Pay amount in Australian dollars"
 
-        self.configureTransactionButton()
+        self.configureMenuButton(self.transactionButton)
+        self.configureMenuButton(self.stateButton)
 
         self.frequencyControl.selectedSegmentIndex = PayFrequency.allCases.firstIndex(of: self.frequency) ?? 2
         self.frequencyControl.addAction(
@@ -126,7 +157,7 @@ final class PayCycleEditorViewController: UIViewController {
                 }
 
                 self.weekday = self.weekdayControl.selectedSegmentIndex + 1
-                self.updatePreview()
+                self.reloadPreview()
             },
             for: .valueChanged
         )
@@ -147,64 +178,72 @@ final class PayCycleEditorViewController: UIViewController {
             },
             for: .valueChanged
         )
-        self.enabledSwitch.isOn = self.existingCycle?.isEnabled ?? true
-        self.enabledSwitch.addTarget(self, action: #selector(self.previewChanged), for: .valueChanged)
 
-        self.previewLabel.font = .preferredFont(forTextStyle: .body)
-        self.previewLabel.adjustsFontForContentSizeCategory = true
-        self.previewLabel.textColor = .secondaryLabel
-        self.previewLabel.numberOfLines = 0
+        self.enabledSwitch.isOn = self.existingCycle?.isEnabled ?? true
+        self.enabledSwitch.accessibilityLabel = "Enabled"
     }
 
+    /// Rebuilds the section list for the current frequency and adjustment, then
+    /// reloads. Row order and titles are the only thing that changes; the controls
+    /// themselves are long-lived.
     private func refreshForm() {
-        self.stack.arrangedSubviews.forEach {
-            self.stack.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
-        self.stack.addArrangedSubview(self.makeField(title: "Name", control: self.nameField))
-        self.stack.addArrangedSubview(self.makeField(title: "Pay amount (AUD)", control: self.amountField))
-        self.stack.addArrangedSubview(self.makeField(title: "Linked transaction", control: self.transactionButton))
-        self.stack.addArrangedSubview(self.makeField(title: "Frequency", control: self.frequencyControl))
+        self.configureTransactionButton()
+        self.configureStateButton()
+
+        var sections: [FormSection] = [
+            FormSection(rows: [self.nameRow, self.amountRow, self.transactionRow]),
+            FormSection(header: "Frequency", rows: [self.frequencyRow]),
+        ]
 
         if self.frequency != .daily {
-            self.stack.addArrangedSubview(self.makeField(title: "When", control: self.ruleControl))
+            var whenRows: [UITableViewCell] = [self.ruleRow]
+
             if self.ruleControl.selectedSegmentIndex == 2 {
                 switch self.frequency {
                 case .weekly:
-                    self.stack.addArrangedSubview(self.makeField(title: "Weekday", control: self.weekdayControl))
+                    whenRows.append(self.weekdayRow)
                 case .monthly:
-                    self.stack.addArrangedSubview(self.makeField(title: "Day of month", control: self.datePicker))
+                    whenRows.append(self.makeDateRow(titled: "Day of month"))
                 case .yearly:
-                    self.stack.addArrangedSubview(self.makeField(title: "Month and day", control: self.datePicker))
+                    whenRows.append(self.makeDateRow(titled: "Month and day"))
                 case .daily:
                     break
                 }
             }
+
+            sections.append(FormSection(header: "When", rows: whenRows))
         }
 
-        self.stack.addArrangedSubview(self.makeField(title: "If weekend or public holiday", control: self.adjustmentControl))
+        var holidayRows: [UITableViewCell] = [self.adjustmentRow]
         if self.adjustment != .none {
-            self.configureStateButton()
-            self.stack.addArrangedSubview(self.makeField(title: "Public holiday calendar", control: self.stateButton))
+            holidayRows.append(self.stateRow)
         }
-        self.stack.addArrangedSubview(self.makeField(title: "Enabled", control: self.enabledSwitch))
-        self.updatePreview()
-        self.stack.addArrangedSubview(self.previewLabel)
+        sections.append(FormSection(header: "If weekend or public holiday", rows: holidayRows))
+
+        // The preview reads as a grouped footer, which is where a form explains the
+        // consequence of the choices above it.
+        sections.append(FormSection(rows: [self.enabledRow], showsPreviewFooter: true))
+
+        self.sections = sections
+        self.tableView.reloadData()
     }
 
-    private func makeField(title: String, control: UIView) -> UIView {
-        let label = UILabel()
-        label.text = title
-        label.font = .preferredFont(forTextStyle: .subheadline)
-        label.adjustsFontForContentSizeCategory = true
-        let stack = UIStackView(arrangedSubviews: [label, control])
-        stack.axis = .vertical
-        stack.spacing = 6
-        return stack
+    private func makeDateRow(titled title: String) -> UITableViewCell {
+        self.dateRow.title = title
+        self.datePicker.accessibilityLabel = title
+        return self.dateRow
+    }
+
+    private func configureMenuButton(_ button: UIButton) {
+        button.showsMenuAsPrimaryAction = true
+        // Trailing, so the choice sits where a grouped row shows its value.
+        button.contentHorizontalAlignment = .trailing
+        button.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        button.titleLabel?.adjustsFontForContentSizeCategory = true
+        button.titleLabel?.lineBreakMode = .byTruncatingTail
     }
 
     private func configureStateButton() {
-        self.stateButton.showsMenuAsPrimaryAction = true
         self.stateButton.menu = UIMenu(children: AustralianStateOrTerritory.allCases.map { state in
             UIAction(title: state.title, state: state == self.state ? .on : .off) { [weak self] _ in
                 self?.state = state
@@ -212,13 +251,10 @@ final class PayCycleEditorViewController: UIViewController {
             }
         })
         self.stateButton.setTitle(self.state.title, for: .normal)
-        self.stateButton.contentHorizontalAlignment = .leading
     }
 
     private func configureTransactionButton() {
         let selected = self.transactions.first { $0.id == self.linkedTransactionID }
-        self.transactionButton.showsMenuAsPrimaryAction = true
-        self.transactionButton.contentHorizontalAlignment = .leading
         self.transactionButton.menu = UIMenu(children: [
             UIAction(title: "No linked transaction", state: selected == nil ? .on : .off) { [weak self] _ in
                 self?.linkedTransactionID = nil
@@ -237,13 +273,25 @@ final class PayCycleEditorViewController: UIViewController {
         )
     }
 
-    private func updatePreview() {
+    /// Only the schedule feeds the preview — name, amount and the enabled switch
+    /// don't move the next pay date — so the footer is refreshed from the controls
+    /// that do, rather than on every keystroke.
+    private var previewText: String {
         let cycle = self.makeCycle(name: self.nameField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Pay")
         guard let display = self.calculator.display(for: cycle) else {
-            self.previewLabel.text = "No upcoming pay date could be calculated."
+            return "No upcoming pay date could be calculated."
+        }
+        return "Next pay: \(display.countdown), \(display.date.formatted(date: .complete, time: .omitted))"
+    }
+
+    /// Reloads the footer's own section, which leaves the date picker and any field
+    /// being edited elsewhere in the form untouched.
+    private func reloadPreview() {
+        guard let section = self.sections.firstIndex(where: \.showsPreviewFooter) else {
             return
         }
-        self.previewLabel.text = "Next pay: \(display.countdown), \(display.date.formatted(date: .complete, time: .omitted))"
+
+        self.tableView.reloadSections(IndexSet(integer: section), with: .none)
     }
 
     private func makeCycle(name: String) -> PayCycle {
@@ -290,16 +338,12 @@ final class PayCycleEditorViewController: UIViewController {
     }
 
     @objc private func dateChanged() {
-        self.updatePreview()
+        self.reloadPreview()
     }
 
     private func adjustmentChanged() {
         self.adjustment = BusinessDayAdjustment.allCases[self.adjustmentControl.selectedSegmentIndex]
         self.refreshForm()
-    }
-
-    @objc private func previewChanged() {
-        self.updatePreview()
     }
 
     @objc private func save() {
@@ -323,5 +367,124 @@ final class PayCycleEditorViewController: UIViewController {
     private func amount() -> Decimal {
         let input = self.amountField.text?.replacingOccurrences(of: ",", with: "") ?? ""
         return Decimal(string: input, locale: Locale(identifier: "en_AU")) ?? 0
+    }
+
+    override func numberOfSections(in tableView: UITableView) -> Int {
+        self.sections.count
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        self.sections[section].rows.count
+    }
+
+    override func tableView(
+        _ tableView: UITableView,
+        cellForRowAt indexPath: IndexPath
+    ) -> UITableViewCell {
+        self.sections[indexPath.section].rows[indexPath.row]
+    }
+
+    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        self.sections[section].header
+    }
+
+    override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
+        self.sections[section].showsPreviewFooter ? self.previewText : nil
+    }
+
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: false)
+
+        // Anywhere in a text row starts editing, the way a Contacts field does,
+        // rather than only the width the text itself occupies.
+        let row = self.sections[indexPath.section].rows[indexPath.row]
+        if row === self.nameRow {
+            self.nameField.becomeFirstResponder()
+        } else if row === self.amountRow {
+            self.amountField.becomeFirstResponder()
+        }
+    }
+}
+
+extension PayCycleEditorViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+}
+
+private struct FormSection {
+    var header: String?
+    var rows: [UITableViewCell]
+    var showsPreviewFooter = false
+}
+
+/// A grouped-list row: the title on the left and its control against the trailing
+/// edge, the way Settings lays out a field or a toggle. A row given no title lets
+/// the control span the full width, which is what a segmented control wants.
+private final class FormRowCell: UITableViewCell {
+    private let titleLabel = UILabel()
+
+    var title: String? {
+        get { self.titleLabel.text }
+        set { self.titleLabel.text = newValue }
+    }
+
+    /// - Parameter stretchesControl: `true` for a control that should take the width
+    ///   the title leaves — a text field, or a button whose value truncates. `false`
+    ///   for one that keeps its own size, like a switch or a compact date picker.
+    init(title: String? = nil, control: UIView, stretchesControl: Bool = true) {
+        super.init(style: .default, reuseIdentifier: nil)
+
+        // The row is a container for its control, so it neither highlights nor
+        // reads as a separate element to VoiceOver.
+        self.selectionStyle = .none
+
+        self.titleLabel.text = title
+        self.titleLabel.font = .preferredFont(forTextStyle: .body)
+        self.titleLabel.adjustsFontForContentSizeCategory = true
+
+        // Whichever of the two isn't hugging its content takes the slack, which is
+        // what puts a switch hard against the trailing edge but lets a field run
+        // back towards its title.
+        self.titleLabel.setContentHuggingPriority(
+            stretchesControl ? .required : .defaultLow,
+            for: .horizontal
+        )
+        self.titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        control.setContentHuggingPriority(
+            stretchesControl ? .defaultLow : .required,
+            for: .horizontal
+        )
+
+        let stack = UIStackView(
+            arrangedSubviews: title == nil ? [control] : [self.titleLabel, control]
+        )
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.alignment = .center
+        stack.spacing = DesignTokens.cardPadding
+        self.contentView.addSubview(stack)
+
+        // Breakable, so the estimated row height the table starts from never
+        // conflicts with the height this resolves to.
+        let bottom = stack.bottomAnchor.constraint(
+            equalTo: self.contentView.layoutMarginsGuide.bottomAnchor
+        )
+        bottom.priority = .required - 1
+
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.trailingAnchor),
+            bottom,
+            self.contentView.heightAnchor.constraint(
+                greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget
+            ),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }

@@ -21,7 +21,9 @@ final class HomeViewController: TabRootViewController {
     private let payCycleStore = PayCycleStore.shared
     private let transactionProvider: any TransactionProviding = SampleTransactionProvider()
 
-    private var accountSelectionTransition: SlideFromSourceTransition?
+    /// Held for whichever tile card is on screen or on its way out — the
+    /// transitioning delegate is weak, and only one card shows at a time.
+    private var cardTransition: SlideFromSourceTransition?
 
     private lazy var customiseItem: UIBarButtonItem = {
         let item = UIBarButtonItem(
@@ -95,11 +97,11 @@ final class HomeViewController: TabRootViewController {
     }
 
     @objc private func handleCustomiseTap() {
-        // The account card covers this button while it is on screen and on its way
-        // out. Refusing the action keeps the ellipsis inert for that whole window
+        // A tile card covers this button while it is on screen and on its way out.
+        // Refusing the action keeps the ellipsis inert for that whole window
         // without disabling it — `isEnabled` cross-fades the button, which reads as
         // the ellipsis animating the moment the card's Done button is pressed.
-        guard self.presentedViewController == nil, self.accountSelectionTransition == nil else {
+        guard self.presentedViewController == nil, self.cardTransition == nil else {
             return
         }
 
@@ -118,34 +120,16 @@ final class HomeViewController: TabRootViewController {
         self.present(Self.makeSheet(for: customise), animated: true)
     }
 
-    /// Custom presentation: fixed-height card flying in right to left out of the
-    /// tile, with a hand-drawn grabber because system sheet chrome is unavailable.
     @objc private func handleAvailableBalanceTileTap() {
-        guard self.presentedViewController == nil else {
+        guard self.presentedViewController == nil, self.cardTransition == nil else {
             return
         }
 
-        let accountSelection = self.makeAccountSelection()
-
-        let transition = SlideFromSourceTransition(
-            sourceView: self.availableBalanceTile
-        ) { [weak self] in
-            // The transitioning delegate is weak and must stay alive until the
-            // animator has formally completed. Holding it also marks the card as
-            // still on its way out, which `handleCustomiseTap` reads.
-            self?.accountSelectionTransition = nil
-        }
-        // `transitioningDelegate` is weak, so the transition has to be held here.
-        self.accountSelectionTransition = transition
-
-        accountSelection.modalPresentationStyle = .custom
-        accountSelection.transitioningDelegate = transition
-
-        self.present(accountSelection, animated: true)
+        self.presentCard(self.makeAccountSelection(), from: self.availableBalanceTile)
     }
 
     @objc private func handlePayCycleTrackerTap() {
-        guard self.presentedViewController == nil else {
+        guard self.presentedViewController == nil, self.cardTransition == nil else {
             return
         }
 
@@ -155,7 +139,27 @@ final class HomeViewController: TabRootViewController {
         ) { [weak self] in
             self?.refreshTiles()
         }
-        self.present(Self.makeSheet(for: payCycles), animated: true)
+
+        self.presentCard(Self.makeCard(for: payCycles), from: self.payCycleTrackerTile)
+    }
+
+    /// Custom presentation: fixed-height card flying in right to left out of the
+    /// tapped tile, with a hand-drawn grabber because system sheet chrome is
+    /// unavailable.
+    private func presentCard(_ content: UIViewController, from sourceView: UIView) {
+        let transition = SlideFromSourceTransition(sourceView: sourceView) { [weak self] in
+            // The transitioning delegate is weak and must stay alive until the
+            // animator has formally completed. Holding it also marks the card as
+            // still on its way out, which `handleCustomiseTap` reads.
+            self?.cardTransition = nil
+        }
+        // `transitioningDelegate` is weak, so the transition has to be held here.
+        self.cardTransition = transition
+
+        content.modalPresentationStyle = .custom
+        content.transitioningDelegate = transition
+
+        self.present(content, animated: true)
     }
 
     private func makeAccountSelection() -> AccountSelectionViewController {
@@ -166,6 +170,16 @@ final class HomeViewController: TabRootViewController {
             self?.selectedAccountIDs = selectedIDs
             self?.refreshTiles()
         }
+    }
+
+    /// A navigation stack sized for the card presentation: the presentation
+    /// controller draws the grabber over the top of the card, so the bar starts
+    /// below that region instead of underneath it.
+    private static func makeCard(for content: UIViewController) -> UINavigationController {
+        let navigationController = UINavigationController(rootViewController: content)
+        navigationController.additionalSafeAreaInsets.top = DesignTokens.sheetToolbarControlsTopInset
+
+        return navigationController
     }
 
     private static func makeSheet(for content: UIViewController) -> UINavigationController {

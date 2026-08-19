@@ -39,15 +39,19 @@ final class PayCycleEditorViewController: UITableViewController {
         control: self.transactionButton,
         stretchesControl: true
     )
-    private lazy var frequencyRow = FormRowCell(control: self.frequencyControl)
-    private lazy var ruleRow = FormRowCell(control: self.ruleControl)
-    private lazy var weekdayRow = FormRowCell(control: self.weekdayControl)
+    // The segmented controls sit on the grouped background under their section
+    // header rather than in a row, because each already draws its own selected pill
+    // and a row behind it reads as a second surface stacked under the first.
+    private lazy var frequencyControlView = FormControlView(control: self.frequencyControl)
+    private lazy var ruleControlView = FormControlView(control: self.ruleControl)
+    private lazy var weekdayControlView = FormControlView(control: self.weekdayControl)
+    private lazy var adjustmentControlView = FormControlView(control: self.adjustmentControl)
+
     private lazy var dateRow = FormRowCell(
         title: "Day of month",
         control: self.datePicker,
         stretchesControl: false
     )
-    private lazy var adjustmentRow = FormRowCell(control: self.adjustmentControl)
     private lazy var stateRow = FormRowCell(
         title: "Public holiday calendar",
         control: self.stateButton,
@@ -192,33 +196,32 @@ final class PayCycleEditorViewController: UITableViewController {
 
         var sections: [FormSection] = [
             FormSection(rows: [self.nameRow, self.amountRow, self.transactionRow]),
-            FormSection(header: "Frequency", rows: [self.frequencyRow]),
+            FormSection(header: "Frequency", control: self.frequencyControlView),
         ]
 
         if self.frequency != .daily {
-            var whenRows: [UITableViewCell] = [self.ruleRow]
+            sections.append(FormSection(header: "When", control: self.ruleControlView))
 
             if self.ruleControl.selectedSegmentIndex == 2 {
                 switch self.frequency {
                 case .weekly:
-                    whenRows.append(self.weekdayRow)
+                    sections.append(FormSection(header: "Weekday", control: self.weekdayControlView))
                 case .monthly:
-                    whenRows.append(self.makeDateRow(titled: "Day of month"))
+                    sections.append(FormSection(rows: [self.makeDateRow(titled: "Day of month")]))
                 case .yearly:
-                    whenRows.append(self.makeDateRow(titled: "Month and day"))
+                    sections.append(FormSection(rows: [self.makeDateRow(titled: "Month and day")]))
                 case .daily:
                     break
                 }
             }
-
-            sections.append(FormSection(header: "When", rows: whenRows))
         }
 
-        var holidayRows: [UITableViewCell] = [self.adjustmentRow]
+        sections.append(
+            FormSection(header: "If weekend or public holiday", control: self.adjustmentControlView)
+        )
         if self.adjustment != .none {
-            holidayRows.append(self.stateRow)
+            sections.append(FormSection(rows: [self.stateRow]))
         }
-        sections.append(FormSection(header: "If weekend or public holiday", rows: holidayRows))
 
         // The preview reads as a grouped footer, which is where a form explains the
         // consequence of the choices above it.
@@ -392,6 +395,13 @@ final class PayCycleEditorViewController: UITableViewController {
         self.sections[section].showsPreviewFooter ? self.previewText : nil
     }
 
+    /// A section carrying a control has no rows, so its footer is where the control
+    /// lands: on the background, directly under its own header. Returning `nil`
+    /// leaves the preview section to the footer title above.
+    override func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        self.sections[section].control
+    }
+
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: false)
 
@@ -415,13 +425,49 @@ extension PayCycleEditorViewController: UITextFieldDelegate {
 
 private struct FormSection {
     var header: String?
-    var rows: [UITableViewCell]
+    var rows: [UITableViewCell] = []
+    /// Shown under the header on the plain background, in place of any rows.
+    var control: UIView?
     var showsPreviewFooter = false
 }
 
+/// Hosts a control on the grouped background between sections, aligned with the
+/// section header above it rather than boxed in a row.
+private final class FormControlView: UIView {
+    init(control: UIView) {
+        super.init(frame: .zero)
+
+        // A section header aligns to the table's own margins, so inheriting them
+        // lines the control up with the title sitting above it.
+        self.preservesSuperviewLayoutMargins = true
+
+        control.translatesAutoresizingMaskIntoConstraints = false
+        self.addSubview(control)
+
+        // Breakable, so the height the table estimates for the footer never
+        // conflicts with the height this resolves to.
+        let bottom = control.bottomAnchor.constraint(
+            equalTo: self.bottomAnchor,
+            constant: -DesignTokens.titleSpacing
+        )
+        bottom.priority = .required - 1
+
+        NSLayoutConstraint.activate([
+            control.topAnchor.constraint(equalTo: self.topAnchor),
+            control.leadingAnchor.constraint(equalTo: self.layoutMarginsGuide.leadingAnchor),
+            control.trailingAnchor.constraint(equalTo: self.layoutMarginsGuide.trailingAnchor),
+            bottom,
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
 /// A grouped-list row: the title on the left and its control against the trailing
-/// edge, the way Settings lays out a field or a toggle. A row given no title lets
-/// the control span the full width, which is what a segmented control wants.
+/// edge, the way Settings lays out a field or a toggle.
 private final class FormRowCell: UITableViewCell {
     private let titleLabel = UILabel()
 
@@ -433,7 +479,7 @@ private final class FormRowCell: UITableViewCell {
     /// - Parameter stretchesControl: `true` for a control that should take the width
     ///   the title leaves — a text field, or a button whose value truncates. `false`
     ///   for one that keeps its own size, like a switch or a compact date picker.
-    init(title: String? = nil, control: UIView, stretchesControl: Bool = true) {
+    init(title: String, control: UIView, stretchesControl: Bool) {
         super.init(style: .default, reuseIdentifier: nil)
 
         // The row is a container for its control, so it neither highlights nor
@@ -457,9 +503,7 @@ private final class FormRowCell: UITableViewCell {
             for: .horizontal
         )
 
-        let stack = UIStackView(
-            arrangedSubviews: title == nil ? [control] : [self.titleLabel, control]
-        )
+        let stack = UIStackView(arrangedSubviews: [self.titleLabel, control])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.alignment = .center
         stack.spacing = DesignTokens.cardPadding

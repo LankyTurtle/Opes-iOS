@@ -9,6 +9,7 @@ final class HomeViewController: TabRootViewController {
     private lazy var dataSource = self.makeDataSource()
 
     private let availableBalanceTile = AvailableBalanceTileView()
+    private let netWorthTile = NetWorthTileView()
     private let payCycleTrackerTile = PayCycleTrackerTileView()
     private let budgetsTile = BudgetsTileView()
     private lazy var recentTile = RecentTransactionsTileView(
@@ -20,6 +21,7 @@ final class HomeViewController: TabRootViewController {
     private let accounts = AccountPreview.sample
     private let payCycleStore = PayCycleStore.shared
     private let transactionProvider: any TransactionProviding = SampleTransactionProvider()
+    private let forecaster = BalanceForecaster()
 
     /// Held for whichever tile card is on screen or on its way out — the
     /// transitioning delegate is weak, and only one card shows at a time.
@@ -57,6 +59,11 @@ final class HomeViewController: TabRootViewController {
         self.availableBalanceTile.addTarget(
             self,
             action: #selector(self.handleAvailableBalanceTileTap),
+            for: .touchUpInside
+        )
+        self.netWorthTile.addTarget(
+            self,
+            action: #selector(self.handleNetWorthTileTap),
             for: .touchUpInside
         )
         self.payCycleTrackerTile.addTarget(
@@ -126,6 +133,17 @@ final class HomeViewController: TabRootViewController {
         }
 
         self.presentCard(self.makeAccountSelection(), from: self.availableBalanceTile)
+    }
+
+    @objc private func handleNetWorthTileTap() {
+        guard self.presentedViewController == nil, self.cardTransition == nil else {
+            return
+        }
+
+        self.presentCard(
+            Self.makeCard(for: ForecastViewController(subject: .netWorth)),
+            from: self.netWorthTile
+        )
     }
 
     @objc private func handlePayCycleTrackerTap() {
@@ -199,6 +217,15 @@ final class HomeViewController: TabRootViewController {
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
         self.availableBalanceTile.show(balance: balance, accountCount: selected.count)
+        self.netWorthTile.show(
+            forecast: self.forecaster.forecast(
+                startingBalance: self.accounts.reduce(Decimal.zero) { $0 + $1.balance },
+                payCycles: self.payCycleStore.load(),
+                spending: SpendingPattern.make(from: self.transactionProvider.transactions()),
+                over: .default
+            ),
+            accountCount: self.accounts.count
+        )
         self.payCycleTrackerTile.show(
             cycles: self.payCycleStore.load(),
             transactions: self.transactionProvider.transactions()
@@ -222,6 +249,8 @@ final class HomeViewController: TabRootViewController {
         switch tile {
         case .availableBalance:
             return self.availableBalanceTile
+        case .netWorth:
+            return self.netWorthTile
         case .payCycleTracker:
             return self.payCycleTrackerTile
         case .budgets:

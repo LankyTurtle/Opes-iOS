@@ -5,7 +5,8 @@ final class AccountsViewController: TabRootViewController {
         case main
     }
 
-    private let accounts = AccountPreview.sample
+    private let accountProvider: any AccountProviding
+    private let accounts: [AccountPreview]
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -14,11 +15,23 @@ final class AccountsViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
+    init(accountProvider: any AccountProviding = SampleAccountProvider()) {
+        self.accountProvider = accountProvider
+        self.accounts = accountProvider.accounts()
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
+        self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
 
         NSLayoutConstraint.activate([
@@ -52,7 +65,8 @@ final class AccountsViewController: TabRootViewController {
             content.text = account.name
             content.secondaryText = account.institution
             cell.contentConfiguration = content
-            cell.accessories = [.label(text: account.formattedBalance)]
+            // The balance, then the chevron the row's forecast is behind.
+            cell.accessories = [.label(text: account.formattedBalance), .disclosureIndicator()]
         }
 
         return UICollectionViewDiffableDataSource<Section, AccountPreview>(
@@ -64,5 +78,20 @@ final class AccountsViewController: TabRootViewController {
                 item: account
             )
         }
+    }
+}
+
+extension AccountsViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+
+        guard let account = self.dataSource.itemIdentifier(for: indexPath) else {
+            return
+        }
+
+        self.navigationController?.pushViewController(
+            ForecastViewController(subject: .account(account), accountProvider: self.accountProvider),
+            animated: true
+        )
     }
 }

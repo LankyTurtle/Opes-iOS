@@ -20,7 +20,7 @@ local sample data only.
 - `App` contains the app and scene delegates.
 - `Enums` contains the app-wide enumerations, including the tab definitions.
 - `Navigation` contains the root tab bar controller.
-- `Features` contains the home, accounts, transactions, budgets, and profile
-  screens.
+- `Features` contains the home, accounts, transactions, budgets, forecast, pay
+  cycle, and profile screens.
 - `Resources` contains the asset catalogue.
 - `Shared` contains reusable presentation components.

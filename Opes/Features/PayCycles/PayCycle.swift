@@ -10,6 +10,9 @@ struct PayCycle: Codable, Hashable, Identifiable {
     /// The transaction that the user associates with this cycle, if available.
     /// It is a stable backend-friendly identifier rather than embedded data.
     var linkedTransactionID: Transaction.ID?
+    /// The account the pay lands in. A forecast for one account only counts the
+    /// cycles paid into it; the net worth forecast counts them all.
+    var accountID: AccountPreview.ID?
     var frequency: PayFrequency
     var rule: PayDateRule
     var businessDayAdjustment: BusinessDayAdjustment
@@ -21,6 +24,7 @@ struct PayCycle: Codable, Hashable, Identifiable {
         name: String,
         amount: Decimal = 0,
         linkedTransactionID: Transaction.ID? = nil,
+        accountID: AccountPreview.ID? = nil,
         frequency: PayFrequency,
         rule: PayDateRule = .firstDay,
         businessDayAdjustment: BusinessDayAdjustment = .none,
@@ -31,6 +35,7 @@ struct PayCycle: Codable, Hashable, Identifiable {
         self.name = name
         self.amount = amount
         self.linkedTransactionID = linkedTransactionID
+        self.accountID = accountID
         self.frequency = frequency
         self.rule = rule
         self.businessDayAdjustment = businessDayAdjustment
@@ -39,17 +44,18 @@ struct PayCycle: Codable, Hashable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, amount, linkedTransactionID, frequency, rule, businessDayAdjustment, stateOrTerritory, isEnabled
+        case id, name, amount, linkedTransactionID, accountID, frequency, rule, businessDayAdjustment, stateOrTerritory, isEnabled
     }
 
-    /// Cycles saved before amount tracking was introduced remain usable; the
-    /// editor asks for an amount when the user next saves one.
+    /// Cycles saved before amount and account tracking were introduced remain
+    /// usable; the editor asks for those when the user next saves one.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
         self.name = try container.decode(String.self, forKey: .name)
         self.amount = try container.decodeIfPresent(Decimal.self, forKey: .amount) ?? 0
         self.linkedTransactionID = try container.decodeIfPresent(Transaction.ID.self, forKey: .linkedTransactionID)
+        self.accountID = try container.decodeIfPresent(AccountPreview.ID.self, forKey: .accountID)
         self.frequency = try container.decode(PayFrequency.self, forKey: .frequency)
         self.rule = try container.decode(PayDateRule.self, forKey: .rule)
         self.businessDayAdjustment = try container.decode(BusinessDayAdjustment.self, forKey: .businessDayAdjustment)

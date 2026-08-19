@@ -32,6 +32,38 @@ struct NextPayDateCalculator {
         return next
     }
 
+    /// Every effective pay date the cycle lands on between `start` and `end`,
+    /// inclusive, so a forecast can credit income on the same days the tracker
+    /// counts down to.
+    ///
+    /// A business-day adjustment can pull a nominal date from just outside the
+    /// window into it, so the scan runs a little wider than the window itself.
+    func payDates(for cycle: PayCycle, from start: Date, to end: Date) -> [Date] {
+        let first = self.calendar.startOfDay(for: start)
+        let last = self.calendar.startOfDay(for: end)
+
+        guard
+            first <= last,
+            var cursor = self.calendar.date(byAdding: .day, value: -7, to: first),
+            let limit = self.calendar.date(byAdding: .day, value: 7, to: last)
+        else {
+            return []
+        }
+
+        var dates: [Date] = []
+        while cursor <= limit {
+            if self.isNominalPayDay(cursor, for: cycle) {
+                let effective = self.calendar.startOfDay(for: self.adjusted(cursor, for: cycle))
+                if effective >= first, effective <= last {
+                    dates.append(effective)
+                }
+            }
+            cursor = self.calendar.date(byAdding: .day, value: 1, to: cursor)!
+        }
+
+        return dates.sorted()
+    }
+
     func display(for cycle: PayCycle, from date: Date = .now) -> PayCycleDateDisplay? {
         guard let next = self.nextPayDate(for: cycle, from: date) else { return nil }
         let start = self.calendar.startOfDay(for: date)

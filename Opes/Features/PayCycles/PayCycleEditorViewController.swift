@@ -11,6 +11,7 @@ final class PayCycleEditorViewController: UITableViewController {
     private let nameField = UITextField()
     private let amountField = UITextField()
     private let transactionButton = UIButton(type: .system)
+    private let accountButton = UIButton(type: .system)
     private let frequencyControl = UISegmentedControl(items: PayFrequency.allCases.map(\.title))
     private let ruleControl = UISegmentedControl(items: ["First", "Last", "Specific"])
     private let weekdayControl = UISegmentedControl(
@@ -47,6 +48,11 @@ final class PayCycleEditorViewController: UITableViewController {
     private lazy var weekdayControlView = FormControlView(control: self.weekdayControl)
     private lazy var adjustmentControlView = FormControlView(control: self.adjustmentControl)
 
+    private lazy var accountRow = FormRowCell(
+        title: "Paid into",
+        control: self.accountButton,
+        stretchesControl: true
+    )
     private lazy var dateRow = FormRowCell(
         title: "Day of month",
         control: self.datePicker,
@@ -71,9 +77,16 @@ final class PayCycleEditorViewController: UITableViewController {
     private var state: AustralianStateOrTerritory
     private var weekday: Int
     private var linkedTransactionID: Transaction.ID?
+    private var accountID: AccountPreview.ID?
     private let transactions: [Transaction]
+    private let accounts: [AccountPreview]
 
-    init(cycle: PayCycle?, transactions: [Transaction], onSave: @escaping (PayCycle) -> Void) {
+    init(
+        cycle: PayCycle?,
+        transactions: [Transaction],
+        accounts: [AccountPreview],
+        onSave: @escaping (PayCycle) -> Void
+    ) {
         self.existingCycle = cycle
         self.onSave = onSave
         self.frequency = cycle?.frequency ?? .monthly
@@ -82,7 +95,9 @@ final class PayCycleEditorViewController: UITableViewController {
         self.state = cycle?.stateOrTerritory ?? .newSouthWales
         self.weekday = cycle?.rule.weekday ?? Calendar.autoupdatingCurrent.firstWeekday
         self.linkedTransactionID = cycle?.linkedTransactionID
+        self.accountID = cycle?.accountID
         self.transactions = transactions
+        self.accounts = accounts
         super.init(style: .insetGrouped)
     }
 
@@ -131,6 +146,7 @@ final class PayCycleEditorViewController: UITableViewController {
         self.amountField.accessibilityLabel = "Pay amount in Australian dollars"
 
         self.configureMenuButton(self.transactionButton)
+        self.configureMenuButton(self.accountButton)
         self.configureMenuButton(self.stateButton)
 
         self.frequencyControl.selectedSegmentIndex = PayFrequency.allCases.firstIndex(of: self.frequency) ?? 2
@@ -192,10 +208,11 @@ final class PayCycleEditorViewController: UITableViewController {
     /// themselves are long-lived.
     private func refreshForm() {
         self.configureTransactionButton()
+        self.configureAccountButton()
         self.configureStateButton()
 
         var sections: [FormSection] = [
-            FormSection(rows: [self.nameRow, self.amountRow, self.transactionRow]),
+            FormSection(rows: [self.nameRow, self.amountRow, self.accountRow, self.transactionRow]),
             FormSection(header: "Frequency", control: self.frequencyControlView),
         ]
 
@@ -244,6 +261,26 @@ final class PayCycleEditorViewController: UITableViewController {
         button.titleLabel?.font = .preferredFont(forTextStyle: .body)
         button.titleLabel?.adjustsFontForContentSizeCategory = true
         button.titleLabel?.lineBreakMode = .byTruncatingTail
+    }
+
+    /// Which account the pay lands in, so a forecast for that account can count it.
+    private func configureAccountButton() {
+        let selected = self.accounts.first { $0.id == self.accountID }
+        self.accountButton.menu = UIMenu(children: [
+            UIAction(title: "No account", state: selected == nil ? .on : .off) { [weak self] _ in
+                self?.accountID = nil
+                self?.refreshForm()
+            },
+        ] + self.accounts.map { account in
+            UIAction(
+                title: "\(account.name) · \(account.institution)",
+                state: account.id == self.accountID ? .on : .off
+            ) { [weak self] _ in
+                self?.accountID = account.id
+                self?.refreshForm()
+            }
+        })
+        self.accountButton.setTitle(selected?.name ?? "No account", for: .normal)
     }
 
     private func configureStateButton() {
@@ -319,6 +356,7 @@ final class PayCycleEditorViewController: UITableViewController {
             name: name,
             amount: self.amount(),
             linkedTransactionID: self.linkedTransactionID,
+            accountID: self.accountID,
             frequency: self.frequency,
             rule: rule,
             businessDayAdjustment: self.adjustment,
@@ -429,106 +467,4 @@ private struct FormSection {
     /// Shown under the header on the plain background, in place of any rows.
     var control: UIView?
     var showsPreviewFooter = false
-}
-
-/// Hosts a control on the grouped background between sections, aligned with the
-/// section header above it rather than boxed in a row.
-private final class FormControlView: UIView {
-    init(control: UIView) {
-        super.init(frame: .zero)
-
-        // A section header aligns to the table's own margins, so inheriting them
-        // lines the control up with the title sitting above it.
-        self.preservesSuperviewLayoutMargins = true
-
-        control.translatesAutoresizingMaskIntoConstraints = false
-        self.addSubview(control)
-
-        // Breakable, so the height the table estimates for the footer never
-        // conflicts with the height this resolves to.
-        let bottom = control.bottomAnchor.constraint(
-            equalTo: self.bottomAnchor,
-            constant: -DesignTokens.titleSpacing
-        )
-        bottom.priority = .required - 1
-
-        NSLayoutConstraint.activate([
-            control.topAnchor.constraint(equalTo: self.topAnchor),
-            control.leadingAnchor.constraint(equalTo: self.layoutMarginsGuide.leadingAnchor),
-            control.trailingAnchor.constraint(equalTo: self.layoutMarginsGuide.trailingAnchor),
-            bottom,
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-/// A grouped-list row: the title on the left and its control against the trailing
-/// edge, the way Settings lays out a field or a toggle.
-private final class FormRowCell: UITableViewCell {
-    private let titleLabel = UILabel()
-
-    var title: String? {
-        get { self.titleLabel.text }
-        set { self.titleLabel.text = newValue }
-    }
-
-    /// - Parameter stretchesControl: `true` for a control that should take the width
-    ///   the title leaves — a text field, or a button whose value truncates. `false`
-    ///   for one that keeps its own size, like a switch or a compact date picker.
-    init(title: String, control: UIView, stretchesControl: Bool) {
-        super.init(style: .default, reuseIdentifier: nil)
-
-        // The row is a container for its control, so it neither highlights nor
-        // reads as a separate element to VoiceOver.
-        self.selectionStyle = .none
-
-        self.titleLabel.text = title
-        self.titleLabel.font = .preferredFont(forTextStyle: .body)
-        self.titleLabel.adjustsFontForContentSizeCategory = true
-
-        // Whichever of the two isn't hugging its content takes the slack, which is
-        // what puts a switch hard against the trailing edge but lets a field run
-        // back towards its title.
-        self.titleLabel.setContentHuggingPriority(
-            stretchesControl ? .required : .defaultLow,
-            for: .horizontal
-        )
-        self.titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-        control.setContentHuggingPriority(
-            stretchesControl ? .defaultLow : .required,
-            for: .horizontal
-        )
-
-        let stack = UIStackView(arrangedSubviews: [self.titleLabel, control])
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.alignment = .center
-        stack.spacing = DesignTokens.cardPadding
-        self.contentView.addSubview(stack)
-
-        // Breakable, so the estimated row height the table starts from never
-        // conflicts with the height this resolves to.
-        let bottom = stack.bottomAnchor.constraint(
-            equalTo: self.contentView.layoutMarginsGuide.bottomAnchor
-        )
-        bottom.priority = .required - 1
-
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.topAnchor),
-            stack.leadingAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: self.contentView.layoutMarginsGuide.trailingAnchor),
-            bottom,
-            self.contentView.heightAnchor.constraint(
-                greaterThanOrEqualToConstant: DesignTokens.minimumTapTarget
-            ),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
 }

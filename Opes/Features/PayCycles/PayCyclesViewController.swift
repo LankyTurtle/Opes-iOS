@@ -3,6 +3,7 @@ import UIKit
 final class PayCyclesViewController: UITableViewController {
     private let store: PayCycleStore
     private let transactionProvider: any TransactionProviding
+    private let accountProvider: any AccountProviding
     private let onChange: () -> Void
     private let calculator = NextPayDateCalculator()
     private var cycles: [PayCycle] = []
@@ -11,10 +12,12 @@ final class PayCyclesViewController: UITableViewController {
     init(
         store: PayCycleStore,
         transactionProvider: any TransactionProviding = SampleTransactionProvider(),
+        accountProvider: any AccountProviding = SampleAccountProvider(),
         onChange: @escaping () -> Void
     ) {
         self.store = store
         self.transactionProvider = transactionProvider
+        self.accountProvider = accountProvider
         self.onChange = onChange
         super.init(style: .insetGrouped)
     }
@@ -57,7 +60,11 @@ final class PayCyclesViewController: UITableViewController {
     }
 
     private func showEditor(for cycle: PayCycle?) {
-        let editor = PayCycleEditorViewController(cycle: cycle, transactions: self.transactions) { [weak self] saved in
+        let editor = PayCycleEditorViewController(
+            cycle: cycle,
+            transactions: self.transactions,
+            accounts: self.accountProvider.accounts()
+        ) { [weak self] saved in
             guard let self else { return }
             self.store.upsert(saved)
             self.onChange()

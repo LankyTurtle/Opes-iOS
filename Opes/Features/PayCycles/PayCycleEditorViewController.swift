@@ -293,6 +293,22 @@ final class PayCycleEditorViewController: UITableViewController {
         self.stateButton.setTitle(self.state.title, for: .normal)
     }
 
+    /// A pay cycle is linked to a deposit, so the menu offers recent money in
+    /// rather than a year of every card tap — with whatever is already linked kept
+    /// in the list however old it is.
+    private var linkableTransactions: [Transaction] {
+        let selected = self.transactions.first { $0.id == self.linkedTransactionID }
+        let recentDeposits = self.transactions
+            .filter { $0.amount > 0 && $0.id != selected?.id }
+            .sorted { $0.date > $1.date }
+            .prefix(Self.linkableTransactionLimit)
+
+        return ([selected].compactMap { $0 } + recentDeposits)
+            .sorted { $0.date > $1.date }
+    }
+
+    private static let linkableTransactionLimit = 20
+
     private func configureTransactionButton() {
         let selected = self.transactions.first { $0.id == self.linkedTransactionID }
         self.transactionButton.menu = UIMenu(children: [
@@ -300,7 +316,7 @@ final class PayCycleEditorViewController: UITableViewController {
                 self?.linkedTransactionID = nil
                 self?.refreshForm()
             },
-        ] + self.transactions.sorted { $0.date > $1.date }.map { transaction in
+        ] + self.linkableTransactions.map { transaction in
             let title = "\(transaction.merchant) · \(transaction.formattedAmount) · \(transaction.formattedDate)"
             return UIAction(title: title, state: transaction.id == self.linkedTransactionID ? .on : .off) { [weak self] _ in
                 self?.linkedTransactionID = transaction.id

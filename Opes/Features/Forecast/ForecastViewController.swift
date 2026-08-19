@@ -1,11 +1,11 @@
 import UIKit
 
-/// Net worth, or one account's balance, projected forward from the user's pay
-/// cycles and their recent spending.
+/// Net worth, or one account's balance: where it has been over the past year, and
+/// where the user's pay cycles and spending patterns take it.
 ///
 /// Both subjects are the same screen because they answer the same question with
 /// the same arithmetic — only the balance being carried forward, the income
-/// counted, and the transactions averaged differ.
+/// counted, and the transactions read differ.
 final class ForecastViewController: UITableViewController {
     enum Subject {
         /// Every account tallied into one position.
@@ -36,6 +36,9 @@ final class ForecastViewController: UITableViewController {
     private var horizon = ForecastHorizon.default
     private var forecast = Forecast.empty(horizon: .default)
     private var sections: [ForecastSection] = []
+    /// The repeats the sections were last built for. The rows only need rebuilding
+    /// when the detected set itself changes, not on every horizon tap.
+    private var shownRecurring: [RecurringTransaction] = []
 
     private let summaryView = ForecastSummaryView()
     private let chartView = ForecastChartView()
@@ -112,10 +115,9 @@ final class ForecastViewController: UITableViewController {
             for: .valueChanged
         )
 
-        // The forecast first, so the sections are built against numbers that are
-        // already in place rather than reloaded a moment later.
+        // Builds the sections as a side effect, against numbers that are already
+        // in place rather than reloaded a moment later.
         self.updateForecast()
-        self.buildSections()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -138,6 +140,13 @@ final class ForecastViewController: UITableViewController {
             ),
         ]
 
+        let repeats = self.shownRecurring.prefix(Self.shownRecurringLimit)
+        if !repeats.isEmpty {
+            sections.append(
+                ForecastSection(header: "Repeating", rows: repeats.map(Self.makeRecurringRow))
+            )
+        }
+
         if case .netWorth = self.subject {
             sections.append(
                 ForecastSection(header: "Accounts", rows: self.accountRows.map(\.cell))
@@ -154,25 +163,25 @@ final class ForecastViewController: UITableViewController {
     }
 
     /// Recomputes from whatever the stores hold now and pushes the result into the
-    /// long-lived views, so nothing but the assumptions footer needs reloading.
+    /// long-lived views, reloading only what the new numbers actually change.
     private func updateForecast() {
         let transactions = self.transactionProvider.transactions()
         let cycles = self.payCycleStore.load()
 
         let startingBalance: Decimal
-        let spending: SpendingPattern
+        let subjectTransactions: [Transaction]
         let payCycles: [PayCycle]
 
         switch self.subject {
         case .netWorth:
             startingBalance = self.accountProvider.accounts()
                 .reduce(Decimal.zero) { $0 + $1.balance }
-            spending = SpendingPattern.make(from: transactions)
+            subjectTransactions = transactions
             payCycles = cycles
 
         case .account(let account):
             startingBalance = account.balance
-            spending = SpendingPattern.make(from: transactions, for: account.id)
+            subjectTransactions = transactions.filter { $0.accountID == account.id }
             // Only the pay the user has told us lands here. A cycle with no account
             // set feeds the net worth forecast but no single account's.
             payCycles = cycles.filter { $0.accountID == account.id }
@@ -180,8 +189,8 @@ final class ForecastViewController: UITableViewController {
 
         self.forecast = self.forecaster.forecast(
             startingBalance: startingBalance,
+            transactions: subjectTransactions,
             payCycles: payCycles,
-            spending: spending,
             over: self.horizon
         )
 
@@ -196,7 +205,22 @@ final class ForecastViewController: UITableViewController {
         self.netLabel.text = ForecastFormatter.signedCurrency(self.forecast.monthlyNet)
         self.netLabel.textColor = self.forecast.monthlyNet < 0 ? .systemRed : .systemTeal
 
-        self.reloadAssumptionsFooter()
+        // Everything above is a long-lived view holding its own new value. Only the
+        // repeats change the shape of the table, and only when the set itself moves.
+        if self.sections.isEmpty || self.shownRecurring != self.forecast.spending.recurring {
+            self.shownRecurring = self.forecast.spending.recurring
+            self.buildSections()
+        } else {
+            self.reloadAssumptionsFooter()
+        }
+    }
+
+    /// One detected repeat: what it is, and what it does to the balance each time.
+    private static func makeRecurringRow(for item: RecurringTransaction) -> UITableViewCell {
+        let label = self.makeValueLabel()
+        label.text = "\(ForecastFormatter.currency(item.amount)) · \(item.cadence.description)"
+
+        return FormRowCell(title: item.merchant, control: label, stretchesControl: true)
     }
 
     /// The footer is the only part that isn't a long-lived view, so it is the only
@@ -225,9 +249,13 @@ final class ForecastViewController: UITableViewController {
             return "Forecast chart. Not enough information to draw a forecast yet."
         }
 
+        let history = forecast.startDate.map {
+            " History from \($0.formatted(.dateTime.month(.wide).year()))."
+        } ?? ""
+
         return """
-            Forecast chart. From \(ForecastFormatter.currency(forecast.startingBalance)) today \
-            to \(ForecastFormatter.currency(forecast.projectedBalance)) in \(forecast.horizon.description).
+            Balance chart.\(history) \(ForecastFormatter.currency(forecast.startingBalance)) today, \
+            projected to \(ForecastFormatter.currency(forecast.projectedBalance)) in \(forecast.horizon.description).
             """
     }
 
@@ -237,8 +265,16 @@ final class ForecastViewController: UITableViewController {
 
         if self.forecast.spending.hasHistory {
             let days = self.forecast.spending.observedDays
+            let repeats = self.forecast.spending.recurring.count
+
+            if repeats > 0 {
+                notes.append(
+                    "\(repeats) repeating \(repeats == 1 ? "payment is" : "payments are") projected onto the dates they next fall on."
+                )
+            }
+
             notes.append(
-                "Spending is the daily average of the last \(days) \(days == 1 ? "day" : "days") of transactions, carried forward."
+                "Everything else is carried forward from \(days) \(days == 1 ? "day" : "days") of transactions, keeping the weekday shape it was spent in."
             )
         } else {
             notes.append("No spending recorded yet, so the projection moves on pay alone.")
@@ -261,6 +297,9 @@ final class ForecastViewController: UITableViewController {
 
         return notes.joined(separator: " ")
     }
+
+    /// Enough to show the shape of the repeats without turning into a statement.
+    private static let shownRecurringLimit = 6
 
     private static func makeValueLabel() -> UILabel {
         let label = UILabel()

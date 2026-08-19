@@ -220,8 +220,8 @@ final class HomeViewController: TabRootViewController {
         self.netWorthTile.show(
             forecast: self.forecaster.forecast(
                 startingBalance: self.accounts.reduce(Decimal.zero) { $0 + $1.balance },
+                transactions: self.transactionProvider.transactions(),
                 payCycles: self.payCycleStore.load(),
-                spending: SpendingPattern.make(from: self.transactionProvider.transactions()),
                 over: .default
             ),
             accountCount: self.accounts.count

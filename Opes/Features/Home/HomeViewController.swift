@@ -71,6 +71,9 @@ final class HomeViewController: TabRootViewController {
             action: #selector(self.handlePayCycleTrackerTap),
             for: .touchUpInside
         )
+        self.recentTile.onSelect = { [weak self] transaction, row in
+            self?.showDetails(for: transaction, from: row)
+        }
 
         NSLayoutConstraint.activate([
             self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
@@ -159,6 +162,19 @@ final class HomeViewController: TabRootViewController {
         }
 
         self.presentCard(Self.makeCard(for: payCycles), from: self.payCycleTrackerTile)
+    }
+
+    private func showDetails(for transaction: Transaction, from row: UIView) {
+        guard self.presentedViewController == nil, self.cardTransition == nil else {
+            return
+        }
+
+        let details = TransactionDetailsViewController(
+            transaction: transaction,
+            transactionProvider: self.transactionProvider
+        )
+
+        self.presentCard(Self.makeCard(for: details), from: row)
     }
 
     /// Custom presentation: fixed-height card flying in right to left out of the

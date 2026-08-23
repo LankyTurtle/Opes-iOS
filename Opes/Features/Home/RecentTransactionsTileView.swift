@@ -1,9 +1,14 @@
 import UIKit
 
-/// Home's summary card of the latest transactions.
+/// Home's summary card of the latest transactions. Tapping a row opens that
+/// transaction's details.
 final class RecentTransactionsTileView: UIView {
     private let headerLabel = UILabel()
     private let rowsStack = UIStackView()
+
+    /// The tapped transaction, and the row it was tapped in — the card grows out
+    /// of the row rather than the whole tile.
+    var onSelect: ((Transaction, UIView) -> Void)?
 
     init(transactions: [Transaction]) {
         super.init(frame: .zero)
@@ -26,7 +31,9 @@ final class RecentTransactionsTileView: UIView {
                 self.rowsStack.addArrangedSubview(self.makeSeparator())
             }
 
-            self.rowsStack.addArrangedSubview(Self.makeRow(for: transaction))
+            let row = TransactionRowControl(transaction: transaction)
+            row.addTarget(self, action: #selector(self.handleRowTap), for: .touchUpInside)
+            self.rowsStack.addArrangedSubview(row)
         }
 
         NSLayoutConstraint.activate([
@@ -46,7 +53,34 @@ final class RecentTransactionsTileView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private static func makeRow(for transaction: Transaction) -> UIView {
+    @objc private func handleRowTap(_ sender: UIControl) {
+        guard let row = sender as? TransactionRowControl else {
+            return
+        }
+
+        self.onSelect?(row.transaction, row)
+    }
+
+    private func makeSeparator() -> UIView {
+        let separator = UIView()
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        separator.backgroundColor = .separator
+        separator.heightAnchor.constraint(
+            equalToConstant: 1 / max(self.traitCollection.displayScale, 1)
+        ).isActive = true
+        return separator
+    }
+}
+
+/// One transaction in the card: the merchant and when it moved, the amount, and
+/// the chevron its details are behind.
+private final class TransactionRowControl: UIControl {
+    let transaction: Transaction
+
+    init(transaction: Transaction) {
+        self.transaction = transaction
+        super.init(frame: .zero)
+
         let merchantLabel = UILabel()
         merchantLabel.font = .preferredFont(forTextStyle: .body)
         merchantLabel.adjustsFontForContentSizeCategory = true
@@ -72,7 +106,13 @@ final class RecentTransactionsTileView: UIView {
         amountLabel.setContentHuggingPriority(.required, for: .horizontal)
         amountLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let row = UIStackView(arrangedSubviews: [detailStack, amountLabel])
+        let disclosureView = UIImageView(image: UIImage(systemName: "chevron.right"))
+        disclosureView.tintColor = .tertiaryLabel
+        disclosureView.setContentHuggingPriority(.required, for: .horizontal)
+        disclosureView.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [detailStack, amountLabel, disclosureView])
+        row.translatesAutoresizingMaskIntoConstraints = false
         row.axis = .horizontal
         row.alignment = .center
         row.spacing = 12
@@ -83,16 +123,32 @@ final class RecentTransactionsTileView: UIView {
             bottom: DesignTokens.rowPadding,
             trailing: 0
         )
-        return row
+        // The row reads as one button; its labels don't take touches.
+        row.isUserInteractionEnabled = false
+        self.addSubview(row)
+
+        self.isAccessibilityElement = true
+        self.accessibilityTraits = .button
+        self.accessibilityLabel =
+            "\(transaction.merchant), \(transaction.formattedAmount), \(transaction.formattedDate)"
+        self.accessibilityHint = "Open the transaction's details"
+
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: self.topAnchor),
+            row.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            row.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+        ])
     }
 
-    private func makeSeparator() -> UIView {
-        let separator = UIView()
-        separator.translatesAutoresizingMaskIntoConstraints = false
-        separator.backgroundColor = .separator
-        separator.heightAnchor.constraint(
-            equalToConstant: 1 / max(self.traitCollection.displayScale, 1)
-        ).isActive = true
-        return separator
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var isHighlighted: Bool {
+        didSet {
+            self.alpha = self.isHighlighted ? 0.6 : 1
+        }
     }
 }

@@ -17,6 +17,25 @@ struct Transaction: Hashable, Identifiable {
     var formattedDate: String {
         self.date.formatted(date: .abbreviated, time: .shortened)
     }
+
+    /// The date spelled out, for a screen with room for it.
+    var formattedFullDate: String {
+        self.date.formatted(.dateTime.weekday(.wide).day().month(.wide).year())
+    }
+
+    var formattedTime: String {
+        self.date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// A transaction of exactly zero moves nothing, so it reads as money out
+    /// alongside the rest of the spending.
+    var isMoneyIn: Bool {
+        self.amount > 0
+    }
+
+    var directionDescription: String {
+        self.isMoneyIn ? "Money in" : "Money out"
+    }
 }
 
 /// Pay cycles depend on this small read interface instead of a particular local

@@ -5,7 +5,9 @@ final class TransactionsViewController: TabRootViewController {
         case main
     }
 
-    private let transactions = Transaction.sample
+    private let accountProvider: any AccountProviding
+    private let transactionProvider: any TransactionProviding
+    private let transactions: [Transaction]
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -33,6 +35,21 @@ final class TransactionsViewController: TabRootViewController {
     /// larger accessibility text sizes.
     private var scaledCompactSearchWidth: CGFloat {
         UIFontMetrics(forTextStyle: .body).scaledValue(for: Self.compactSearchWidth)
+    }
+
+    init(
+        accountProvider: any AccountProviding = SampleAccountProvider(),
+        transactionProvider: any TransactionProviding = SampleTransactionProvider()
+    ) {
+        self.accountProvider = accountProvider
+        self.transactionProvider = transactionProvider
+        self.transactions = transactionProvider.transactions()
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     override func viewDidLoad() {
@@ -314,7 +331,11 @@ final class TransactionsViewController: TabRootViewController {
             content.text = transaction.merchant
             content.secondaryText = transaction.formattedDate
             cell.contentConfiguration = content
-            cell.accessories = [.label(text: transaction.formattedAmount)]
+            // The amount, then the chevron the row's details are behind.
+            cell.accessories = [
+                .label(text: transaction.formattedAmount),
+                .disclosureIndicator(),
+            ]
         }
 
         return UICollectionViewDiffableDataSource<Section, Transaction>(
@@ -352,6 +373,27 @@ extension TransactionsViewController: UISearchBarDelegate {
 }
 
 extension TransactionsViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+
+        guard let transaction = self.dataSource.itemIdentifier(for: indexPath) else {
+            return
+        }
+
+        // The keyboard would otherwise still be up under the details screen, and
+        // ride back into view on the way here.
+        self.dismissSearchKeyboard()
+
+        self.navigationController?.pushViewController(
+            TransactionDetailsViewController(
+                transaction: transaction,
+                accountProvider: self.accountProvider,
+                transactionProvider: self.transactionProvider
+            ),
+            animated: true
+        )
+    }
+
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         self.dismissSearchKeyboard()
     }

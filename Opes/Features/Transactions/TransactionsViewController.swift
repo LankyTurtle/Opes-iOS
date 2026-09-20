@@ -17,7 +17,6 @@ final class TransactionsViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
-    private let emptyLabel = UILabel()
     private let searchControl = UIStackView()
     private let searchBar = UISearchBar()
     private let closeButton = UIButton(type: .system)
@@ -79,15 +78,6 @@ final class TransactionsViewController: TabRootViewController {
         // Identify the list explicitly so the floating search control doesn't
         // interfere with the navigation bar's scroll-edge behavior.
         self.setContentScrollView(self.collectionView, for: .top)
-
-        self.emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        self.emptyLabel.font = .preferredFont(forTextStyle: .body)
-        self.emptyLabel.adjustsFontForContentSizeCategory = true
-        self.emptyLabel.textColor = .secondaryLabel
-        self.emptyLabel.textAlignment = .center
-        self.emptyLabel.text = "No matching transactions"
-        self.emptyLabel.isHidden = true
-        self.view.addSubview(self.emptyLabel)
 
         // Added last so it stays above the list and the empty state — the user has
         // to be able to reach the field to clear a search that matched nothing.
@@ -161,11 +151,6 @@ final class TransactionsViewController: TabRootViewController {
             // Pinned past the safe area so rows scroll under the tab bar.
             self.collectionView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
 
-            self.emptyLabel.centerXAnchor.constraint(equalTo: self.view.centerXAnchor),
-            self.emptyLabel.centerYAnchor.constraint(equalTo: self.collectionView.centerYAnchor),
-            self.emptyLabel.leadingAnchor.constraint(equalTo: marginsGuide.leadingAnchor),
-            self.emptyLabel.trailingAnchor.constraint(equalTo: marginsGuide.trailingAnchor),
-
             self.compactSearchCenterConstraint,
             self.compactSearchWidthConstraint,
             // The keyboard layout guide sits at the safe area bottom — above the tab
@@ -228,7 +213,7 @@ final class TransactionsViewController: TabRootViewController {
         super.viewDidLayoutSubviews()
 
         // Let the last row clear the floating search field.
-        let bottomInset = self.searchControl.bounds.height + 8
+        let bottomInset: CGFloat = self.searchControl.isHidden ? 0 : self.searchControl.bounds.height + 8
         if self.collectionView.contentInset.bottom != bottomInset {
             self.collectionView.contentInset.bottom = bottomInset
             self.collectionView.verticalScrollIndicatorInsets.bottom = bottomInset
@@ -358,6 +343,14 @@ final class TransactionsViewController: TabRootViewController {
     }
 
     private func apply(query: String, animated: Bool, completion: (() -> Void)? = nil) {
+        self.searchControl.isHidden = self.transactions.isEmpty
+        if self.transactions.isEmpty {
+            self.searchBar.text = ""
+            self.searchBar.searchTextField.resignFirstResponder()
+            self.setSearchExpanded(false, animated: false)
+        }
+        self.view.setNeedsLayout()
+
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = trimmed.isEmpty
             ? self.transactions
@@ -368,8 +361,19 @@ final class TransactionsViewController: TabRootViewController {
         snapshot.appendItems(matches, toSection: .main)
         self.dataSource.apply(snapshot, animatingDifferences: animated, completion: completion)
 
-        self.emptyLabel.text = trimmed.isEmpty ? "No transactions" : "No matching transactions"
-        self.emptyLabel.isHidden = !matches.isEmpty
+        var empty = UIContentUnavailableConfiguration.empty()
+        if self.transactions.isEmpty {
+            empty.image = UIImage(systemName: "arrow.left.arrow.right")
+            empty.text = "No transactions"
+            empty.secondaryText = "Tap + to add a transaction or upload a CSV."
+        } else {
+            empty.image = UIImage(systemName: "magnifyingglass")
+            empty.text = "No matching transactions"
+            empty.secondaryText = "Try a different search."
+        }
+        self.contentUnavailableConfiguration = matches.isEmpty ? empty : nil
+        // Keep search accessible above the system empty-state view.
+        self.view.bringSubviewToFront(self.searchControl)
     }
 
     private func makeLayout() -> UICollectionViewLayout {

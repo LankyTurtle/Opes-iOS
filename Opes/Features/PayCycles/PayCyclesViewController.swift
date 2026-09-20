@@ -30,10 +30,10 @@ final class PayCyclesViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.title = "Pay Cycles"
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .add,
+        self.navigationItem.rightBarButtonItem = AppBarButtonItem.add(
             target: self,
-            action: #selector(self.addCycle)
+            action: #selector(self.addCycle),
+            accessibilityLabel: "Add pay cycle"
         )
         self.tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PayCycleCell")
         self.reload()

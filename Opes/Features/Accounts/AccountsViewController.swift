@@ -35,10 +35,11 @@ final class AccountsViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .add, target: self, action: #selector(self.addAccount)
+        self.navigationItem.rightBarButtonItem = AppBarButtonItem.add(
+            target: self,
+            action: #selector(self.addAccount),
+            accessibilityLabel: "Add account"
         )
-        self.navigationItem.rightBarButtonItem?.accessibilityLabel = "Add account"
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear

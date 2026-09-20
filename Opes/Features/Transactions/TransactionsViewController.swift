@@ -58,8 +58,7 @@ final class TransactionsViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let addItem = UIBarButtonItem(
-            image: UIImage(systemName: "plus"),
+        self.navigationItem.rightBarButtonItem = AppBarButtonItem.add(
             menu: UIMenu(children: [
                 UIAction(title: "Add Manually", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
                     self?.showManualEntry()
@@ -67,10 +66,9 @@ final class TransactionsViewController: TabRootViewController {
                 UIAction(title: "Upload CSV", image: UIImage(systemName: "doc.badge.arrow.up")) { [weak self] _ in
                     self?.showCSVUpload()
                 },
-            ])
+            ]),
+            accessibilityLabel: "Add transaction"
         )
-        addItem.accessibilityLabel = "Add transaction"
-        self.navigationItem.rightBarButtonItem = addItem
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear

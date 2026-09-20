@@ -19,6 +19,22 @@ protocol AccountProviding {
     func accounts() -> [AccountPreview]
 }
 
+extension AccountStore: AccountProviding {
+    func accounts() -> [AccountPreview] {
+        AccountPreview.sample + ((try? self.load()) ?? []).map { AccountPreview(account: $0) }
+    }
+}
+
+extension AccountPreview {
+    init(account: Account) {
+        self.init(
+            id: account.id, name: account.name, balance: account.balance,
+            institution: account.institution,
+            institutionLogo: UIImage(systemName: "building.columns.fill") ?? UIImage()
+        )
+    }
+}
+
 struct SampleAccountProvider: AccountProviding {
     func accounts() -> [AccountPreview] {
         AccountPreview.sample

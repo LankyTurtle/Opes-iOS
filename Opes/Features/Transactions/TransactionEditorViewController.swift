@@ -1,7 +1,7 @@
 import UIKit
 
 final class TransactionEditorViewController: UITableViewController {
-    private let accounts: [AccountPreview]
+    private var accounts: [AccountPreview]
     private let onSave: (Transaction) throws -> Void
     private var accountID: AccountPreview.ID?
 
@@ -71,12 +71,7 @@ final class TransactionEditorViewController: UITableViewController {
     }
 
     private func configureAccountMenu() {
-        self.accountButton.menu = UIMenu(children: [
-            UIAction(title: "No account", state: self.accountID == nil ? .on : .off) { [weak self] _ in
-                self?.accountID = nil
-                self?.configureAccountMenu()
-            },
-        ] + self.accounts.map { account in
+        self.accountButton.menu = UIMenu(children: self.accounts.map { account in
             UIAction(
                 title: "\(account.name) · \(account.institution)",
                 state: self.accountID == account.id ? .on : .off
@@ -84,29 +79,47 @@ final class TransactionEditorViewController: UITableViewController {
                 self?.accountID = account.id
                 self?.configureAccountMenu()
             }
-        })
+        } + [
+            UIAction(title: "Add New Account…", image: UIImage(systemName: "plus")) { [weak self] _ in
+                self?.addAccount()
+            },
+        ])
         self.accountButton.setTitle(
-            self.accounts.first { $0.id == self.accountID }?.name ?? "No account",
+            self.accounts.first { $0.id == self.accountID }.map { "\($0.name) · \($0.institution)" } ?? "Select account",
             for: .normal
         )
+        self.validateForm()
+    }
+
+    private func addAccount() {
+        self.view.endEditing(true)
+        let editor = AccountEditorViewController { [weak self] account in
+            guard let self else { return }
+            self.accounts.append(account)
+            self.accountID = account.id
+            self.configureAccountMenu()
+        }
+        self.navigationController?.pushViewController(editor, animated: true)
     }
 
     @objc private func validateForm() {
         self.navigationItem.rightBarButtonItem?.isEnabled =
             !(self.merchantField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && TransactionAmount.parse(self.amountField.text ?? "") != nil
+            && self.accounts.contains { $0.id == self.accountID }
     }
 
     @objc private func save() {
         let merchant = (self.merchantField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !merchant.isEmpty, let amount = TransactionAmount.parse(self.amountField.text ?? "") else {
+        guard !merchant.isEmpty, let amount = TransactionAmount.parse(self.amountField.text ?? ""),
+              let account = self.accounts.first(where: { $0.id == self.accountID }) else {
             return
         }
         do {
             try self.onSave(Transaction(
                 id: UUID(), merchant: merchant, date: self.datePicker.date,
                 amount: self.directionControl.selectedSegmentIndex == 0 ? -amount : amount,
-                accountID: self.accountID
+                accountID: account.id
             ))
             self.navigationController?.popViewController(animated: true)
         } catch {

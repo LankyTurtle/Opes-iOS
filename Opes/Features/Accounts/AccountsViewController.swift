@@ -6,7 +6,6 @@ final class AccountsViewController: TabRootViewController {
     }
 
     private let accountProvider: any AccountProviding
-    private let accounts: [AccountPreview]
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -15,9 +14,8 @@ final class AccountsViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
-    init(accountProvider: any AccountProviding = SampleAccountProvider()) {
+    init(accountProvider: any AccountProviding = AccountStore.shared) {
         self.accountProvider = accountProvider
-        self.accounts = accountProvider.accounts()
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -42,7 +40,12 @@ final class AccountsViewController: TabRootViewController {
             self.collectionView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
         ])
 
-        self.apply(accounts: self.accounts)
+        self.apply(accounts: self.accountProvider.accounts())
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.apply(accounts: self.accountProvider.accounts())
     }
 
     private func apply(accounts: [AccountPreview]) {

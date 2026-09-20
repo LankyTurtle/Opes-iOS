@@ -6,8 +6,8 @@ struct Transaction: Codable, Hashable, Identifiable {
     let date: Date
     /// Negative for money out, positive for money in.
     let amount: Decimal
-    /// The account the money moved through. Optional because an imported or
-    /// manually entered transaction may not name one.
+    /// Required for newly saved transactions. Optional for decoding older local
+    /// history that was saved before account selection was mandatory.
     let accountID: AccountPreview.ID?
     let sourceInstitution: String?
 

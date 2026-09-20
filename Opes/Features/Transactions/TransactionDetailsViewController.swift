@@ -37,7 +37,7 @@ final class TransactionDetailsViewController: UITableViewController {
 
     init(
         transaction: Transaction,
-        accountProvider: any AccountProviding = SampleAccountProvider(),
+        accountProvider: any AccountProviding = AccountStore.shared,
         transactionProvider: any TransactionProviding = TransactionStore.shared
     ) {
         self.transaction = transaction

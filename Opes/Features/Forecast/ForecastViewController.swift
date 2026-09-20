@@ -85,7 +85,7 @@ final class ForecastViewController: UITableViewController {
 
     init(
         subject: Subject,
-        accountProvider: any AccountProviding = SampleAccountProvider(),
+        accountProvider: any AccountProviding = AccountStore.shared,
         transactionProvider: any TransactionProviding = TransactionStore.shared,
         payCycleStore: PayCycleStore = .shared
     ) {

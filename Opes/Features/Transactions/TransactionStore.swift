@@ -26,6 +26,9 @@ final class TransactionStore: TransactionProviding {
     }
 
     func save(_ newTransactions: [Transaction]) throws {
+        guard newTransactions.allSatisfy({ $0.accountID != nil }) else {
+            throw SaveError.accountRequired
+        }
         var transactions = try self.load()
         let identifiers = Set(newTransactions.map(\.id))
         transactions.removeAll { identifiers.contains($0.id) }
@@ -38,5 +41,10 @@ final class TransactionStore: TransactionProviding {
             return []
         }
         return try JSONDecoder().decode([Transaction].self, from: data)
+    }
+
+    enum SaveError: LocalizedError {
+        case accountRequired
+        var errorDescription: String? { "Select an account for every transaction before saving." }
     }
 }

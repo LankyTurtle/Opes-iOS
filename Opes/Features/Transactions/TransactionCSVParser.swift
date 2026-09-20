@@ -8,7 +8,7 @@ enum TransactionCSVParser {
         var errorDescription: String? { self.message }
     }
 
-    static func parse(_ data: Data, institution: String) throws -> [Transaction] {
+    static func parse(_ data: Data, accountID: UUID, institution: String) throws -> [Transaction] {
         guard data.count <= TransactionCSVAttachment.maximumFileSize else {
             throw TransactionCSVAttachment.AttachmentError.tooLarge
         }
@@ -94,7 +94,7 @@ enum TransactionCSVParser {
             guard amount != 0 else { throw invalid("The amount must be greater or less than zero.") }
             return Transaction(
                 id: UUID(), merchant: merchant, date: date, amount: amount,
-                accountID: nil, sourceInstitution: institution
+                accountID: accountID, sourceInstitution: institution
             )
         }
     }

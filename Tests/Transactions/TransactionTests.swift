@@ -4,6 +4,7 @@ import Foundation
 enum TransactionTests {
     struct Failure: Error { let message: String }
     static var checks = 0
+    static let accountID = UUID()
 
     static func expect(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {
         guard try condition() else { throw Failure(message: message) }
@@ -21,7 +22,7 @@ enum TransactionTests {
     }
 
     static func parse(_ csv: String) throws -> [Transaction] {
-        try TransactionCSVParser.parse(Data(csv.utf8), institution: "Test Bank")
+        try TransactionCSVParser.parse(Data(csv.utf8), accountID: self.accountID, institution: "Test Bank")
     }
 
     static func main() throws {
@@ -36,7 +37,7 @@ enum TransactionTests {
         let signed = try self.parse("\u{FEFF}Date,Description,Amount\r\n20/09/2026,Groceries,-12.34\r\n2026-09-19,Salary,100.00\r\n")
         try self.expect(signed.count == 2 && signed[0].amount == Decimal(string: "-12.34"), "BOM, CRLF, signed amounts")
         try self.expect(signed[1].isMoneyIn, "Positive amount direction")
-        try self.expect(signed[0].sourceInstitution == "Test Bank" && signed[0].accountID == nil, "Institution retained without guessing an account")
+        try self.expect(signed.allSatisfy { $0.sourceInstitution == "Test Bank" && $0.accountID == self.accountID }, "Every imported row belongs to the selected account")
         let quoted = try self.parse("Date,Description,Amount\n20/09/2026,\"Cafe, \"\"Main\"\"\nStreet\",\"-1,234.56\"")
         try self.expect(quoted[0].merchant == "Cafe, \"Main\"\nStreet", "Quoted comma, escaped quotes, embedded newline")
         try self.expect(quoted[0].amount == Decimal(string: "-1234.56"), "Grouped amounts")
@@ -45,7 +46,7 @@ enum TransactionTests {
         let currency = try self.parse("Date,Merchant,Amount\n20/09/2026,Refund,$20.00\n20/09/2026,Shop,(12.34)")
         try self.expect(currency.map(\.amount) == [20, Decimal(string: "-12.34")!], "Currency and accounting negative")
         let utf16 = "Date,Description,Amount\n20/09/2026,Shop,-1".data(using: .utf16)!
-        try self.expect(try TransactionCSVParser.parse(utf16, institution: "Bank").count == 1, "UTF-16 BOM")
+        try self.expect(try TransactionCSVParser.parse(utf16, accountID: self.accountID, institution: "Bank").count == 1, "UTF-16 BOM")
         try self.expect(try self.parse("\nDate,Description,Amount\n\n20/09/2026,Shop,-1\n\n").count == 1, "Blank lines")
 
         for csv in [
@@ -70,13 +71,13 @@ enum TransactionTests {
             try self.rejects("Reject malformed/ambiguous CSV") { _ = try self.parse(csv) }
         }
         try self.rejects("Reject oversized data") {
-            _ = try TransactionCSVParser.parse(Data(repeating: 65, count: TransactionCSVAttachment.maximumFileSize + 1), institution: "Bank")
+            _ = try TransactionCSVParser.parse(Data(repeating: 65, count: TransactionCSVAttachment.maximumFileSize + 1), accountID: self.accountID, institution: "Bank")
         }
         try self.rejects("Reject too many rows") {
             _ = try self.parse("Date,Description,Amount\n" + String(repeating: "20/09/2026,Shop,-1\n", count: 20_001))
         }
         try self.rejects("Reject invalid encoding") {
-            _ = try TransactionCSVParser.parse(Data([0xFF, 0x00, 0xFF]), institution: "Bank")
+            _ = try TransactionCSVParser.parse(Data([0xFF, 0x00, 0xFF]), accountID: self.accountID, institution: "Bank")
         }
 
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -101,11 +102,32 @@ enum TransactionTests {
             func transactions() -> [Transaction] { [] }
         }
         let store = TransactionStore(defaults: defaults, sampleProvider: EmptyProvider())
+        let accounts = AccountStore(defaults: defaults)
+        let created = try accounts.create(name: " Everyday ", institution: " Test Bank ")
+        let second = try accounts.create(name: "Savings", institution: "Test Bank")
+        try self.expect(created.name == "Everyday" && created.institution == "Test Bank", "Trim account details")
+        try self.expect(try AccountStore(defaults: defaults).load() == [created, second], "Accounts and stable IDs survive reload")
+        try self.expect(created.id != second.id, "Accounts at the same institution remain distinct")
+        try self.rejects("Reject an empty account name") { _ = try accounts.create(name: "  ", institution: "Bank") }
+        try self.rejects("Reject an empty institution") { _ = try accounts.create(name: "Everyday", institution: "  ") }
+        let firstAccountRows = try TransactionCSVParser.parse(bytes, accountID: created.id, institution: created.institution)
+        let secondAccountRows = try TransactionCSVParser.parse(bytes, accountID: second.id, institution: second.institution)
+        try self.expect(firstAccountRows.allSatisfy { $0.accountID == created.id }, "Import links to newly created account")
+        try self.expect(secondAccountRows.allSatisfy { $0.accountID == second.id }, "Reparsing for a different account changes every link")
+        let unlinked = Transaction(id: UUID(), merchant: "Unlinked", date: .now, amount: -1, accountID: nil)
+        try self.rejects("Reject unlinked manual transaction") { try store.save(unlinked) }
+        try self.rejects("Reject whole import with an unlinked row") { try store.save(firstAccountRows + [unlinked]) }
+        try self.expect(store.transactions().isEmpty, "Rejected import does not partially save")
         try store.save(signed)
         let reloaded = TransactionStore(defaults: defaults, sampleProvider: EmptyProvider())
         try self.expect(reloaded.transactions() == signed.sorted { $0.date > $1.date }, "Transactions persist with institution and decimal amounts")
         try store.save(signed[0])
         try self.expect(store.transactions().count == 2, "Saving same transaction is an upsert")
+        try store.save(firstAccountRows)
+        try self.expect(reloaded.transactions().contains { $0.accountID == created.id }, "Account link survives transaction reload")
+        defaults.set(Data("broken".utf8), forKey: "accounts.v1")
+        try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", institution: "Bank") }
+        try self.expect(defaults.data(forKey: "accounts.v1") == Data("broken".utf8), "Corrupt account data retained for recovery")
         defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
         try self.rejects("Do not overwrite corrupted history") { try store.save(signed[0]) }
         try self.expect(defaults.data(forKey: "manualTransactions.v1") == Data("broken".utf8), "Corrupt history remains available for recovery")

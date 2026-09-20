@@ -18,7 +18,7 @@ final class HomeViewController: TabRootViewController {
 
     private var tileOrder = HomeTileOrder.load()
 
-    private let accounts = AccountPreview.sample
+    private var accounts: [AccountPreview] { AccountStore.shared.accounts() }
     private let payCycleStore = PayCycleStore.shared
     private let transactionProvider: any TransactionProviding = TransactionStore.shared
     private let forecaster = BalanceForecaster()

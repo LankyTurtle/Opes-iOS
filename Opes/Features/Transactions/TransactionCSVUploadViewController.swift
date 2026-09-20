@@ -2,22 +2,22 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class TransactionCSVUploadViewController: UITableViewController {
-    private let institutions: [String]
+    private var accounts: [AccountPreview]
     private let onImport: ([Transaction]) throws -> Void
-    private var institution: String?
+    private var selectedAccount: AccountPreview?
     private var fileName: String?
     private var fileData: Data?
     private var isReadingFile = false
     private var parsedTransactions: [Transaction] = []
     private var isParsing = false
     private var isImporting = false
-    private let institutionButton = UIButton(type: .system)
-    private lazy var institutionRow = FormRowCell(
-        title: "Institution", control: self.institutionButton, stretchesControl: true
+    private let accountButton = UIButton(type: .system)
+    private lazy var accountRow = FormRowCell(
+        title: "Account", control: self.accountButton, stretchesControl: true
     )
 
     init(accounts: [AccountPreview], onImport: @escaping ([Transaction]) throws -> Void) {
-        self.institutions = Array(Set(accounts.map(\.institution))).sorted()
+        self.accounts = accounts
         self.onImport = onImport
         super.init(style: .insetGrouped)
     }
@@ -34,64 +34,56 @@ final class TransactionCSVUploadViewController: UITableViewController {
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(
             title: "Upload", style: .done, target: self, action: #selector(self.confirmUpload)
         )
-        self.institutionButton.showsMenuAsPrimaryAction = true
-        self.institutionButton.contentHorizontalAlignment = .trailing
-        self.institutionButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
-        self.institutionButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        self.institutionButton.titleLabel?.lineBreakMode = .byTruncatingTail
-        self.institutionButton.accessibilityLabel = "Institution"
+        self.accountButton.showsMenuAsPrimaryAction = true
+        self.accountButton.contentHorizontalAlignment = .trailing
+        self.accountButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        self.accountButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        self.accountButton.titleLabel?.lineBreakMode = .byTruncatingTail
+        self.accountButton.accessibilityLabel = "Account"
         self.refresh()
     }
 
     private func refresh() {
-        var choices = self.institutions
-        if let institution = self.institution, !choices.contains(institution) {
-            choices.append(institution)
-        }
-        self.institutionButton.menu = UIMenu(children: choices.map { institution in
-            UIAction(title: institution, state: self.institution == institution ? .on : .off) { [weak self] _ in
-                self?.institution = institution
+        self.accountButton.menu = UIMenu(children: self.accounts.map { account in
+            UIAction(title: "\(account.name) · \(account.institution)", state: self.selectedAccount?.id == account.id ? .on : .off) { [weak self] _ in
+                self?.selectedAccount = account
                 self?.parsedTransactions = []
                 self?.refresh()
             }
         } + [
-            UIAction(title: "Other Institution…") { [weak self] _ in
-                self?.enterInstitution()
+            UIAction(title: "Add New Account…", image: UIImage(systemName: "plus")) { [weak self] _ in
+                self?.addAccount()
             },
         ])
-        self.institutionButton.setTitle(self.institution ?? "Select institution", for: .normal)
-        self.institutionButton.isEnabled = !self.isReadingFile && !self.isParsing
+        self.accountButton.setTitle(self.selectedAccount.map { "\($0.name) · \($0.institution)" } ?? "Select account", for: .normal)
+        self.accountButton.isEnabled = !self.isReadingFile && !self.isParsing
         self.navigationItem.rightBarButtonItem?.title = self.isParsing ? "Parsing…" : "Upload"
         self.navigationItem.rightBarButtonItem?.isEnabled =
-            self.institution != nil && self.fileData != nil && !self.isReadingFile
+            self.selectedAccount != nil && self.fileData != nil && !self.isReadingFile
             && !self.isParsing && self.parsedTransactions.isEmpty
         self.tableView.reloadData()
     }
 
-    private func enterInstitution() {
-        let alert = UIAlertController(title: "Institution", message: "Enter the institution this CSV is from.", preferredStyle: .alert)
-        alert.addTextField { field in
-            field.placeholder = "Institution name"
-            field.autocapitalizationType = .words
+    private func addAccount() {
+        let editor = AccountEditorViewController { [weak self] account in
+            guard let self else { return }
+            self.accounts.append(account)
+            self.selectedAccount = account
+            self.parsedTransactions = []
+            self.refresh()
         }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Use Institution", style: .default) { [weak self, weak alert] _ in
-            let name = (alert?.textFields?.first?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { return }
-            self?.institution = name
-            self?.parsedTransactions = []
-            self?.refresh()
-        })
-        self.present(alert, animated: true)
+        self.navigationController?.pushViewController(editor, animated: true)
     }
 
     @objc private func confirmUpload() {
-        guard let institution, let fileData, !self.isReadingFile, !self.isParsing,
+        guard let selectedAccount, let fileData, !self.isReadingFile, !self.isParsing,
               self.parsedTransactions.isEmpty else { return }
         self.isParsing = true
         self.refresh()
+        let accountID = selectedAccount.id
+        let institution = selectedAccount.institution
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let result = Result { try TransactionCSVParser.parse(fileData, institution: institution) }
+            let result = Result { try TransactionCSVParser.parse(fileData, accountID: accountID, institution: institution) }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isParsing = false
@@ -112,6 +104,8 @@ final class TransactionCSVUploadViewController: UITableViewController {
 
     private func importTransactions() {
         guard !self.parsedTransactions.isEmpty, !self.isReadingFile, !self.isParsing, !self.isImporting else { return }
+        guard let selectedAccount,
+              self.parsedTransactions.allSatisfy({ $0.accountID == selectedAccount.id }) else { return }
         self.isImporting = true
         do {
             try self.onImport(self.parsedTransactions)
@@ -154,19 +148,19 @@ final class TransactionCSVUploadViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         if section == 2 { return "\(self.parsedTransactions.count) transactions ready to import" }
-        return section == 0 ? "Institution" : "CSV file"
+        return section == 0 ? "Account" : "CSV file"
     }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        if section == 0 { return "Choose the institution that exported your transactions." }
+        if section == 0 { return "Select the account these transactions belong to, or add a new account from the menu." }
         if section == 2 {
-            return "Previewing the first \(min(self.parsedTransactions.count, 5)) transactions. Import adds all \(self.parsedTransactions.count) to your list in AUD."
+            return "Previewing the first \(min(self.parsedTransactions.count, 5)) transactions. Import adds all \(self.parsedTransactions.count) to \(self.selectedAccount?.name ?? "the selected account") in AUD."
         }
         return "Choose a CSV (up to 10 MB), then tap Upload to parse it. Include Date, Description and Amount columns, or Debit and Credit instead of Amount. Dates use day/month/year or year-month-day. Negative amounts are money out."
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == 0 { return self.institutionRow }
+        if indexPath.section == 0 { return self.accountRow }
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         var content = cell.defaultContentConfiguration()
         if indexPath.section == 2 {
@@ -196,7 +190,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
             let isRemove = indexPath.row == 2
             content.text = self.isReadingFile ? "Reading file…" : (isRemove ? "Remove File" : (self.fileData == nil ? "Choose File" : "Replace File"))
             content.image = UIImage(systemName: isRemove ? "trash" : "folder")
-            let enabled = !self.isReadingFile && !self.isParsing && self.institution != nil
+            let enabled = !self.isReadingFile && !self.isParsing && self.selectedAccount != nil
             content.textProperties.color = enabled ? (isRemove ? .systemRed : self.view.tintColor) : .secondaryLabel
             content.imageProperties.tintColor = content.textProperties.color
             cell.isUserInteractionEnabled = enabled
@@ -213,7 +207,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
             self.importTransactions()
             return
         }
-        guard indexPath.section == 1, !self.isReadingFile, !self.isParsing, self.institution != nil else { return }
+        guard indexPath.section == 1, !self.isReadingFile, !self.isParsing, self.selectedAccount != nil else { return }
         if indexPath.row == 2 {
             self.removeFile()
         } else if self.fileData == nil || indexPath.row == 1 {

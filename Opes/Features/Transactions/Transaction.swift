@@ -1,6 +1,6 @@
 import Foundation
 
-struct Transaction: Hashable, Identifiable {
+struct Transaction: Codable, Hashable, Identifiable {
     let id: UUID
     let merchant: String
     let date: Date
@@ -9,6 +9,19 @@ struct Transaction: Hashable, Identifiable {
     /// The account the money moved through. Optional because an imported or
     /// manually entered transaction may not name one.
     let accountID: AccountPreview.ID?
+    let sourceInstitution: String?
+
+    init(
+        id: UUID, merchant: String, date: Date, amount: Decimal,
+        accountID: AccountPreview.ID?, sourceInstitution: String? = nil
+    ) {
+        self.id = id
+        self.merchant = merchant
+        self.date = date
+        self.amount = amount
+        self.accountID = accountID
+        self.sourceInstitution = sourceInstitution
+    }
 
     var formattedAmount: String {
         self.amount.formatted(.currency(code: "AUD"))

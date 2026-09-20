@@ -26,15 +26,7 @@ final class RecentTransactionsTileView: UIView {
         self.rowsStack.axis = .vertical
         self.addSubview(self.rowsStack)
 
-        for (index, transaction) in transactions.enumerated() {
-            if index > 0 {
-                self.rowsStack.addArrangedSubview(self.makeSeparator())
-            }
-
-            let row = TransactionRowControl(transaction: transaction)
-            row.addTarget(self, action: #selector(self.handleRowTap), for: .touchUpInside)
-            self.rowsStack.addArrangedSubview(row)
-        }
+        self.show(transactions: transactions)
 
         NSLayoutConstraint.activate([
             self.headerLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: DesignTokens.cardPadding),
@@ -51,6 +43,21 @@ final class RecentTransactionsTileView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func show(transactions: [Transaction]) {
+        for view in self.rowsStack.arrangedSubviews {
+            self.rowsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        for (index, transaction) in transactions.enumerated() {
+            if index > 0 {
+                self.rowsStack.addArrangedSubview(self.makeSeparator())
+            }
+            let row = TransactionRowControl(transaction: transaction)
+            row.addTarget(self, action: #selector(self.handleRowTap), for: .touchUpInside)
+            self.rowsStack.addArrangedSubview(row)
+        }
     }
 
     @objc private func handleRowTap(_ sender: UIControl) {

@@ -11,7 +11,7 @@ final class PayCyclesViewController: UITableViewController {
 
     init(
         store: PayCycleStore,
-        transactionProvider: any TransactionProviding = SampleTransactionProvider(),
+        transactionProvider: any TransactionProviding = TransactionStore.shared,
         accountProvider: any AccountProviding = SampleAccountProvider(),
         onChange: @escaping () -> Void
     ) {

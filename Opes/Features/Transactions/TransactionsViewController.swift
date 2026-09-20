@@ -7,7 +7,8 @@ final class TransactionsViewController: TabRootViewController {
 
     private let accountProvider: any AccountProviding
     private let transactionProvider: any TransactionProviding
-    private let transactions: [Transaction]
+    private var transactions: [Transaction]
+    private let transactionStore: TransactionStore
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -39,10 +40,12 @@ final class TransactionsViewController: TabRootViewController {
 
     init(
         accountProvider: any AccountProviding = SampleAccountProvider(),
-        transactionProvider: any TransactionProviding = SampleTransactionProvider()
+        transactionProvider: any TransactionProviding = TransactionStore.shared,
+        transactionStore: TransactionStore = .shared
     ) {
         self.accountProvider = accountProvider
         self.transactionProvider = transactionProvider
+        self.transactionStore = transactionStore
         self.transactions = transactionProvider.transactions()
         super.init(nibName: nil, bundle: nil)
     }
@@ -54,6 +57,20 @@ final class TransactionsViewController: TabRootViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        let addItem = UIBarButtonItem(
+            image: UIImage(systemName: "plus"),
+            menu: UIMenu(children: [
+                UIAction(title: "Add Manually", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
+                    self?.showManualEntry()
+                },
+                UIAction(title: "Upload CSV", image: UIImage(systemName: "doc.badge.arrow.up")) { [weak self] _ in
+                    self?.showCSVUpload()
+                },
+            ])
+        )
+        addItem.accessibilityLabel = "Add transaction"
+        self.navigationItem.rightBarButtonItem = addItem
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -166,6 +183,32 @@ final class TransactionsViewController: TabRootViewController {
         )
 
         self.apply(query: "", animated: false)
+    }
+
+    private func showManualEntry() {
+        self.dismissSearchKeyboard()
+        let editor = TransactionEditorViewController(accounts: self.accountProvider.accounts()) { [weak self] transaction in
+            guard let self else { return }
+            try self.transactionStore.save(transaction)
+            self.transactions.insert(transaction, at: 0)
+            self.transactions.sort { $0.date > $1.date }
+            self.apply(query: self.searchBar.text ?? "", animated: true)
+        }
+        self.navigationController?.pushViewController(editor, animated: true)
+    }
+
+    private func showCSVUpload() {
+        self.dismissSearchKeyboard()
+        self.navigationController?.pushViewController(
+            TransactionCSVUploadViewController(accounts: self.accountProvider.accounts()) { [weak self] transactions in
+                guard let self else { return }
+                try self.transactionStore.save(transactions)
+                self.transactions.append(contentsOf: transactions)
+                self.transactions.sort { $0.date > $1.date }
+                self.apply(query: self.searchBar.text ?? "", animated: true)
+            },
+            animated: true
+        )
     }
 
     @objc private func handleContentSizeCategoryChange() {

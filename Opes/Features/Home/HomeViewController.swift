@@ -13,14 +13,14 @@ final class HomeViewController: TabRootViewController {
     private let payCycleTrackerTile = PayCycleTrackerTileView()
     private let budgetsTile = BudgetsTileView()
     private lazy var recentTile = RecentTransactionsTileView(
-        transactions: Self.recentTransactions()
+        transactions: Array(self.transactionProvider.transactions().prefix(5))
     )
 
     private var tileOrder = HomeTileOrder.load()
 
     private let accounts = AccountPreview.sample
     private let payCycleStore = PayCycleStore.shared
-    private let transactionProvider: any TransactionProviding = SampleTransactionProvider()
+    private let transactionProvider: any TransactionProviding = TransactionStore.shared
     private let forecaster = BalanceForecaster()
 
     /// Held for whichever tile card is on screen or on its way out — the
@@ -229,6 +229,7 @@ final class HomeViewController: TabRootViewController {
     }
 
     private func refreshTiles() {
+        self.recentTile.show(transactions: Array(self.transactionProvider.transactions().prefix(5)))
         let selected = self.accounts.filter { self.selectedAccountIDs.contains($0.id) }
         let balance = selected.reduce(Decimal.zero) { $0 + $1.balance }
 
@@ -321,11 +322,6 @@ final class HomeViewController: TabRootViewController {
         }
     }
 
-    /// Sorted rather than trusting the sample data's order, so this still holds
-    /// once transactions come from a real store.
-    private static func recentTransactions() -> [Transaction] {
-        Array(Transaction.sample.sorted { $0.date > $1.date }.prefix(5))
-    }
 }
 
 extension HomeViewController: UICollectionViewDelegate {

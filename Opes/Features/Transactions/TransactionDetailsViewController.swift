@@ -38,7 +38,7 @@ final class TransactionDetailsViewController: UITableViewController {
     init(
         transaction: Transaction,
         accountProvider: any AccountProviding = SampleAccountProvider(),
-        transactionProvider: any TransactionProviding = SampleTransactionProvider()
+        transactionProvider: any TransactionProviding = TransactionStore.shared
     ) {
         self.transaction = transaction
         self.accountProvider = accountProvider
@@ -78,6 +78,9 @@ final class TransactionDetailsViewController: UITableViewController {
             details.append(Self.makeDetailRow(title: "Institution", value: account.institution))
         } else {
             details.append(Self.makeDetailRow(title: "Account", value: "Not linked"))
+            if let institution = self.transaction.sourceInstitution {
+                details.append(Self.makeDetailRow(title: "Institution", value: institution))
+            }
         }
 
         var sections: [DetailsSection] = [

@@ -26,6 +26,7 @@ enum TransactionTests {
     }
 
     static func main() throws {
+        try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")
         try self.expect(TransactionAmount.parse(" 12.34 ", locale: au) != nil, "Manual whitespace")
@@ -98,11 +99,10 @@ enum TransactionTests {
         let suite = "TransactionTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        struct EmptyProvider: TransactionProviding {
-            func transactions() -> [Transaction] { [] }
-        }
-        let store = TransactionStore(defaults: defaults, sampleProvider: EmptyProvider())
+        let store = TransactionStore(defaults: defaults)
         let accounts = AccountStore(defaults: defaults)
+        try self.expect(store.transactions().isEmpty, "Fresh install starts without transactions")
+        try self.expect(try accounts.load().isEmpty, "Fresh install starts without accounts")
         let created = try accounts.create(name: " Everyday ", institution: " Test Bank ")
         let second = try accounts.create(name: "Savings", institution: "Test Bank")
         try self.expect(created.name == "Everyday" && created.institution == "Test Bank", "Trim account details")
@@ -119,7 +119,7 @@ enum TransactionTests {
         try self.rejects("Reject whole import with an unlinked row") { try store.save(firstAccountRows + [unlinked]) }
         try self.expect(store.transactions().isEmpty, "Rejected import does not partially save")
         try store.save(signed)
-        let reloaded = TransactionStore(defaults: defaults, sampleProvider: EmptyProvider())
+        let reloaded = TransactionStore(defaults: defaults)
         try self.expect(reloaded.transactions() == signed.sorted { $0.date > $1.date }, "Transactions persist with institution and decimal amounts")
         try store.save(signed[0])
         try self.expect(store.transactions().count == 2, "Saving same transaction is an upsert")
@@ -133,26 +133,15 @@ enum TransactionTests {
         try store.delete(id: signed[0].id)
         try store.delete(id: UUID())
         try self.expect(reloaded.transactions().count == beforeDeletion.count - 1, "Repeated or unknown deletion leaves other rows intact")
-        struct FixedProvider: TransactionProviding {
-            let values: [Transaction]
-            func transactions() -> [Transaction] { self.values }
-        }
-        let sampleRows = try self.parse("Date,Description,Amount\n20/09/2026,Same merchant,-1\n20/09/2026,Same merchant,-1")
-        let sampleProvider = FixedProvider(values: sampleRows)
-        let sampleStore = TransactionStore(defaults: defaults, sampleProvider: sampleProvider)
-        try sampleStore.delete(id: sampleRows[1].id)
-        let sampleReloaded = TransactionStore(defaults: defaults, sampleProvider: sampleProvider)
-        try self.expect(!sampleReloaded.transactions().contains { $0.id == sampleRows[1].id }, "Deleted sample stays deleted after recreation of store")
-        try self.expect(sampleReloaded.transactions().contains { $0.id == sampleRows[0].id }, "Identical-looking sample with different ID remains")
-        try self.expect(sampleReloaded.transactions().filter { $0.merchant == "Same merchant" }.count == 1, "Search results exclude deleted transaction")
-        try sampleStore.delete(id: sampleRows[0].id)
+        let duplicateRows = try self.parse("Date,Description,Amount\n20/09/2026,Same merchant,-1\n20/09/2026,Same merchant,-1")
+        try store.save(duplicateRows)
+        try store.delete(id: duplicateRows[1].id)
+        try self.expect(!reloaded.transactions().contains { $0.id == duplicateRows[1].id }, "Deleted transaction stays deleted after recreation of store")
+        try self.expect(reloaded.transactions().contains { $0.id == duplicateRows[0].id }, "Identical-looking transaction with different ID remains")
+        try self.expect(reloaded.transactions().filter { $0.merchant == "Same merchant" }.count == 1, "Search results exclude deleted transaction")
+        try store.delete(id: duplicateRows[0].id)
         for transaction in store.transactions() { try store.delete(id: transaction.id) }
-        try self.expect(sampleReloaded.transactions().isEmpty, "Deleting all samples and saved transactions produces empty history")
-        defaults.set(Data("broken".utf8), forKey: "deletedSampleTransactions.v1")
-        let priorHistory = defaults.data(forKey: "manualTransactions.v1")
-        try self.rejects("Reject deletion with corrupted deletion history") { try store.delete(id: signed[0].id) }
-        try self.expect(defaults.data(forKey: "manualTransactions.v1") == priorHistory, "Failed deletion does not mutate transaction history")
-        defaults.removeObject(forKey: "deletedSampleTransactions.v1")
+        try self.expect(reloaded.transactions().isEmpty, "Deleting all transactions produces empty history")
         defaults.set(Data("broken".utf8), forKey: "accounts.v1")
         try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", institution: "Bank") }
         try self.expect(defaults.data(forKey: "accounts.v1") == Data("broken".utf8), "Corrupt account data retained for recovery")
@@ -161,5 +150,59 @@ enum TransactionTests {
         try self.rejects("Do not delete with corrupted transaction history") { try store.delete(id: signed[0].id) }
         try self.expect(defaults.data(forKey: "manualTransactions.v1") == Data("broken".utf8), "Corrupt history remains available for recovery")
         print("Passed \(self.checks) transaction checks.")
+    }
+
+    static func accountDeletionChecks() throws {
+        let suite = "AccountDeletionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let accounts = AccountStore(defaults: defaults)
+        let target = try accounts.create(name: "Everyday", institution: "Bank")
+        let other = try accounts.create(name: "Everyday", institution: "Bank")
+        func transaction(_ accountID: UUID) -> Transaction {
+            Transaction(id: UUID(), merchant: "Shop", date: .now, amount: -10, accountID: accountID)
+        }
+        let transactions = TransactionStore(defaults: defaults)
+        let savedTarget = transaction(target.id)
+        let savedOther = transaction(other.id)
+        try transactions.save([savedTarget, savedOther])
+        try accounts.delete(id: target.id, transactionStore: transactions)
+        let reopenedAccounts = AccountStore(defaults: defaults)
+        let reopenedTransactions = TransactionStore(defaults: defaults)
+        try self.expect(try reopenedAccounts.load() == [other], "Account deletion persists and preserves same-name accounts")
+        try self.expect(try reopenedAccounts.deletedAccountIDs().contains(target.id), "Deleted account ID is retained")
+        try self.expect(reopenedTransactions.transactions() == [savedOther], "Cascade removes transactions for only the deleted account")
+        let savedRows = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "manualTransactions.v1")!)
+        try self.expect(savedRows == [savedOther], "Cascade physically removes saved linked history")
+        try accounts.delete(id: target.id, transactionStore: transactions)
+        try self.expect(reopenedTransactions.transactions().count == 1, "Repeated account deletion is harmless")
+        try self.rejects("Stale form cannot save to deleted account") { try transactions.save(savedTarget) }
+        try self.rejects("New transaction ID cannot revive deleted account history") { try transactions.save(transaction(target.id)) }
+        let emptyAccount = try accounts.create(name: "Empty", institution: "Bank")
+        try accounts.delete(id: emptyAccount.id, transactionStore: transactions)
+        try self.expect(try accounts.load() == [other], "Delete account with no linked transactions")
+
+        // Decode failures must not leave the account and its history half-deleted.
+        let goodAccounts = defaults.data(forKey: "accounts.v1")!
+        let goodTransactions = defaults.data(forKey: "manualTransactions.v1")!
+        let goodDeletedAccounts = defaults.data(forKey: "deletedAccounts.v1")!
+        let goodDeletedTransactionAccounts = defaults.data(forKey: "transactionDeletedAccounts.v1")!
+        defaults.set(Data("broken".utf8), forKey: "accounts.v1")
+        try self.rejects("Reject cascade with corrupt accounts") { try accounts.delete(id: other.id, transactionStore: transactions) }
+        try self.expect(defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Account read failure preserves linked history")
+        defaults.set(goodAccounts, forKey: "accounts.v1")
+        defaults.set(Data("broken".utf8), forKey: "deletedAccounts.v1")
+        try self.rejects("Reject cascade with corrupt account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
+        try self.expect(defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Account deletion record failure preserves history")
+        defaults.set(goodDeletedAccounts, forKey: "deletedAccounts.v1")
+        defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
+        try self.rejects("Reject cascade with corrupt transactions") { try accounts.delete(id: other.id, transactionStore: transactions) }
+        try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts, "Transaction read failure preserves account")
+        try self.expect(defaults.data(forKey: "deletedAccounts.v1") == goodDeletedAccounts, "Failed cascade does not hide account")
+        defaults.set(goodTransactions, forKey: "manualTransactions.v1")
+        defaults.set(Data("broken".utf8), forKey: "transactionDeletedAccounts.v1")
+        try self.rejects("Reject cascade with corrupt transaction account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
+        try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts && defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Failed cascade preserves both stores")
+        defaults.set(goodDeletedTransactionAccounts, forKey: "transactionDeletedAccounts.v1")
     }
 }

@@ -6,16 +6,24 @@ final class AccountsViewController: TabRootViewController {
     }
 
     private let accountProvider: any AccountProviding
+    private let accountStore: AccountStore
+    private let transactionStore: TransactionStore
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
-        collectionViewLayout: Self.makeLayout()
+        collectionViewLayout: self.makeLayout()
     )
 
     private lazy var dataSource = self.makeDataSource()
 
-    init(accountProvider: any AccountProviding = AccountStore.shared) {
-        self.accountProvider = accountProvider
+    init(
+        accountProvider: (any AccountProviding)? = nil,
+        accountStore: AccountStore = .shared,
+        transactionStore: TransactionStore = .shared
+    ) {
+        self.accountProvider = accountProvider ?? accountStore
+        self.accountStore = accountStore
+        self.transactionStore = transactionStore
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -26,6 +34,11 @@ final class AccountsViewController: TabRootViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .add, target: self, action: #selector(self.addAccount)
+        )
+        self.navigationItem.rightBarButtonItem?.accessibilityLabel = "Add account"
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -48,15 +61,52 @@ final class AccountsViewController: TabRootViewController {
         self.apply(accounts: self.accountProvider.accounts())
     }
 
-    private func apply(accounts: [AccountPreview]) {
+    @objc private func addAccount() {
+        let editor = AccountEditorViewController(store: self.accountStore) { [weak self] _ in
+            guard let self else { return }
+            self.apply(accounts: self.accountProvider.accounts())
+        }
+        self.navigationController?.pushViewController(editor, animated: true)
+    }
+
+    private func apply(accounts: [AccountPreview], animated: Bool = false, completion: (() -> Void)? = nil) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, AccountPreview>()
         snapshot.appendSections([.main])
         snapshot.appendItems(accounts, toSection: .main)
-        self.dataSource.apply(snapshot, animatingDifferences: false)
+        self.dataSource.apply(snapshot, animatingDifferences: animated, completion: completion)
+        var empty = UIContentUnavailableConfiguration.empty()
+        empty.image = UIImage(systemName: "wallet.bifold")
+        empty.text = "No accounts"
+        empty.secondaryText = "Tap + to add an account."
+        self.contentUnavailableConfiguration = accounts.isEmpty ? empty : nil
     }
 
-    private static func makeLayout() -> UICollectionViewLayout {
-        let configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+    private func makeLayout() -> UICollectionViewLayout {
+        var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+        configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
+            guard let self, let account = self.dataSource.itemIdentifier(for: indexPath) else { return nil }
+            let delete = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
+                guard let self else { completion(false); return }
+                do {
+                    try self.accountStore.delete(id: account.id, transactionStore: self.transactionStore)
+                    self.apply(
+                        accounts: self.dataSource.snapshot().itemIdentifiers.filter { $0.id != account.id },
+                        animated: true
+                    ) { completion(true) }
+                } catch {
+                    completion(false)
+                    let alert = UIAlertController(
+                        title: "Couldn’t delete account", message: error.localizedDescription, preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
+            delete.image = UIImage(systemName: "trash")
+            let actions = UISwipeActionsConfiguration(actions: [delete])
+            actions.performsFirstActionWithFullSwipe = true
+            return actions
+        }
         return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 

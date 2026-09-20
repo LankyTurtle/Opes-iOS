@@ -50,6 +50,15 @@ final class RecentTransactionsTileView: UIView {
             self.rowsStack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+        if transactions.isEmpty {
+            let label = UILabel()
+            label.text = "No transactions yet"
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            label.textColor = .secondaryLabel
+            label.numberOfLines = 0
+            self.rowsStack.addArrangedSubview(label)
+        }
         for (index, transaction) in transactions.enumerated() {
             if index > 0 {
                 self.rowsStack.addArrangedSubview(self.makeSeparator())

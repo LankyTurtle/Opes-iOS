@@ -1,25 +1,23 @@
 import Foundation
 
-/// User-entered transactions are kept separately from the prototype's sample history.
+/// Local persistence for manually entered and imported transactions.
 final class TransactionStore: TransactionProviding {
     static let shared = TransactionStore()
 
     private let defaults: UserDefaults
-    private let sampleProvider: any TransactionProviding
     private let key = "manualTransactions.v1"
-    private let deletedSampleIDsKey = "deletedSampleTransactions.v1"
+    private let deletedAccountIDsKey = "transactionDeletedAccounts.v1"
 
-    init(
-        defaults: UserDefaults = .standard,
-        sampleProvider: any TransactionProviding = SampleTransactionProvider()
-    ) {
+    init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.sampleProvider = sampleProvider
     }
 
     func transactions() -> [Transaction] {
-        let deletedIDs = (try? self.deletedSampleIDs()) ?? []
-        return (self.sampleProvider.transactions().filter { !deletedIDs.contains($0.id) } + ((try? self.load()) ?? []))
+        let deletedAccounts = (try? self.deletedAccountIDs()) ?? []
+        return ((try? self.load()) ?? [])
+            .filter { transaction in
+                transaction.accountID.map { !deletedAccounts.contains($0) } ?? true
+            }
             .sorted { $0.date > $1.date }
     }
 
@@ -31,6 +29,10 @@ final class TransactionStore: TransactionProviding {
         guard newTransactions.allSatisfy({ $0.accountID != nil }) else {
             throw SaveError.accountRequired
         }
+        let deletedAccounts = try self.deletedAccountIDs()
+        guard newTransactions.allSatisfy({ transaction in
+            transaction.accountID.map { !deletedAccounts.contains($0) } ?? false
+        }) else { throw SaveError.accountDeleted }
         var transactions = try self.load()
         let identifiers = Set(newTransactions.map(\.id))
         transactions.removeAll { identifiers.contains($0.id) }
@@ -40,21 +42,24 @@ final class TransactionStore: TransactionProviding {
 
     func delete(id: Transaction.ID) throws {
         let remaining = try self.load().filter { $0.id != id }
-        var deletedIDs = try self.deletedSampleIDs()
-        if self.sampleProvider.transactions().contains(where: { $0.id == id }) {
-            deletedIDs.insert(id)
-        }
-        // Prepare both values before mutating storage so decoding or encoding
-        // failures leave the existing history intact.
         let remainingData = try JSONEncoder().encode(remaining)
-        let deletedData = try JSONEncoder().encode(deletedIDs)
-        self.defaults.set(deletedData, forKey: self.deletedSampleIDsKey)
         self.defaults.set(remainingData, forKey: self.key)
     }
 
-    private func deletedSampleIDs() throws -> Set<Transaction.ID> {
-        guard let data = self.defaults.data(forKey: self.deletedSampleIDsKey) else { return [] }
-        return try JSONDecoder().decode(Set<Transaction.ID>.self, from: data)
+    func delete(accountID: Account.ID) throws {
+        let remaining = try self.load().filter { $0.accountID != accountID }
+        var deletedAccounts = try self.deletedAccountIDs()
+        deletedAccounts.insert(accountID)
+        let remainingData = try JSONEncoder().encode(remaining)
+        let deletedData = try JSONEncoder().encode(deletedAccounts)
+        // Remember deleted accounts so stale forms cannot save new linked history.
+        self.defaults.set(deletedData, forKey: self.deletedAccountIDsKey)
+        self.defaults.set(remainingData, forKey: self.key)
+    }
+
+    private func deletedAccountIDs() throws -> Set<Account.ID> {
+        guard let data = self.defaults.data(forKey: self.deletedAccountIDsKey) else { return [] }
+        return try JSONDecoder().decode(Set<Account.ID>.self, from: data)
     }
 
     private func load() throws -> [Transaction] {
@@ -66,6 +71,12 @@ final class TransactionStore: TransactionProviding {
 
     enum SaveError: LocalizedError {
         case accountRequired
-        var errorDescription: String? { "Select an account for every transaction before saving." }
+        case accountDeleted
+        var errorDescription: String? {
+            switch self {
+            case .accountRequired: "Select an account for every transaction before saving."
+            case .accountDeleted: "This account has been deleted. Select another account before saving."
+            }
+        }
     }
 }

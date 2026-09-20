@@ -1,8 +1,9 @@
 # Opes
 
 Opes is a native iOS application for personal budgeting and payments. This
-repository contains the UIKit application foundation with sample data and
-locally saved manual and CSV-imported transactions.
+repository contains the UIKit application foundation with locally saved accounts
+and manual and CSV-imported transactions. Account and transaction lists start empty
+on a fresh install; existing user-created records are preserved on upgrade.
 
 ## Requirements
 
@@ -17,14 +18,19 @@ locally saved manual and CSV-imported transactions.
 
 ## Adding transactions
 
+On Accounts, tap **+** to add an account. Swipe left on an account to reveal
+**Delete**, or swipe fully to delete it and all linked transactions. Deletions
+persist across launches. Other accounts and
+their history are preserved.
+
 On Transactions, tap **+** to choose **Add Manually** or **Upload CSV**.
 Manual entry supports an AUD amount, money in/out, date, merchant/description,
 and a required account. Saved transactions also appear in Home and the
 transaction providers used by forecasts and pay cycles.
 
 Swipe left on a transaction to reveal **Delete**, or swipe fully to delete it.
-Deletion works within search results and persists across launches, including for
-sample transactions. Home and forecasts use the updated history when reopened.
+Deletion works within search results and persists across launches.
+Home and forecasts use the updated history when reopened.
 The bottom of the transaction detail screen also offers **Delete Transaction**.
 Deleting there returns to the list or closes the Home detail card and refreshes
 the visible history.

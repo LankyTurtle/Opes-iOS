@@ -45,6 +45,9 @@ final class AccountsViewController: TabRootViewController {
         self.collectionView.backgroundColor = .clear
         self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
+        // Keep the account list connected to the navigation bar when switching
+        // between the empty state and populated rows.
+        self.setContentScrollView(self.collectionView, for: .top)
 
         NSLayoutConstraint.activate([
             self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
@@ -59,6 +62,8 @@ final class AccountsViewController: TabRootViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        self.navigationController?.hidesBarsOnSwipe = false
+        self.navigationController?.setNavigationBarHidden(false, animated: animated)
         self.apply(accounts: self.accountProvider.accounts())
     }
 

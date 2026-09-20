@@ -125,11 +125,40 @@ enum TransactionTests {
         try self.expect(store.transactions().count == 2, "Saving same transaction is an upsert")
         try store.save(firstAccountRows)
         try self.expect(reloaded.transactions().contains { $0.accountID == created.id }, "Account link survives transaction reload")
+        let beforeDeletion = store.transactions()
+        try store.delete(id: signed[0].id)
+        try self.expect(reloaded.transactions() == beforeDeletion.filter { $0.id != signed[0].id }, "Delete exact transaction and preserve others across reload")
+        let storedAfterDeletion = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "manualTransactions.v1")!)
+        try self.expect(!storedAfterDeletion.contains { $0.id == signed[0].id }, "Manual and imported transactions are removed from storage")
+        try store.delete(id: signed[0].id)
+        try store.delete(id: UUID())
+        try self.expect(reloaded.transactions().count == beforeDeletion.count - 1, "Repeated or unknown deletion leaves other rows intact")
+        struct FixedProvider: TransactionProviding {
+            let values: [Transaction]
+            func transactions() -> [Transaction] { self.values }
+        }
+        let sampleRows = try self.parse("Date,Description,Amount\n20/09/2026,Same merchant,-1\n20/09/2026,Same merchant,-1")
+        let sampleProvider = FixedProvider(values: sampleRows)
+        let sampleStore = TransactionStore(defaults: defaults, sampleProvider: sampleProvider)
+        try sampleStore.delete(id: sampleRows[1].id)
+        let sampleReloaded = TransactionStore(defaults: defaults, sampleProvider: sampleProvider)
+        try self.expect(!sampleReloaded.transactions().contains { $0.id == sampleRows[1].id }, "Deleted sample stays deleted after recreation of store")
+        try self.expect(sampleReloaded.transactions().contains { $0.id == sampleRows[0].id }, "Identical-looking sample with different ID remains")
+        try self.expect(sampleReloaded.transactions().filter { $0.merchant == "Same merchant" }.count == 1, "Search results exclude deleted transaction")
+        try sampleStore.delete(id: sampleRows[0].id)
+        for transaction in store.transactions() { try store.delete(id: transaction.id) }
+        try self.expect(sampleReloaded.transactions().isEmpty, "Deleting all samples and saved transactions produces empty history")
+        defaults.set(Data("broken".utf8), forKey: "deletedSampleTransactions.v1")
+        let priorHistory = defaults.data(forKey: "manualTransactions.v1")
+        try self.rejects("Reject deletion with corrupted deletion history") { try store.delete(id: signed[0].id) }
+        try self.expect(defaults.data(forKey: "manualTransactions.v1") == priorHistory, "Failed deletion does not mutate transaction history")
+        defaults.removeObject(forKey: "deletedSampleTransactions.v1")
         defaults.set(Data("broken".utf8), forKey: "accounts.v1")
         try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", institution: "Bank") }
         try self.expect(defaults.data(forKey: "accounts.v1") == Data("broken".utf8), "Corrupt account data retained for recovery")
         defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
         try self.rejects("Do not overwrite corrupted history") { try store.save(signed[0]) }
+        try self.rejects("Do not delete with corrupted transaction history") { try store.delete(id: signed[0].id) }
         try self.expect(defaults.data(forKey: "manualTransactions.v1") == Data("broken".utf8), "Corrupt history remains available for recovery")
         print("Passed \(self.checks) transaction checks.")
     }

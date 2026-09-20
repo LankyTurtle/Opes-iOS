@@ -7,6 +7,7 @@ final class TransactionStore: TransactionProviding {
     private let defaults: UserDefaults
     private let sampleProvider: any TransactionProviding
     private let key = "manualTransactions.v1"
+    private let deletedSampleIDsKey = "deletedSampleTransactions.v1"
 
     init(
         defaults: UserDefaults = .standard,
@@ -17,7 +18,8 @@ final class TransactionStore: TransactionProviding {
     }
 
     func transactions() -> [Transaction] {
-        (self.sampleProvider.transactions() + ((try? self.load()) ?? []))
+        let deletedIDs = (try? self.deletedSampleIDs()) ?? []
+        return (self.sampleProvider.transactions().filter { !deletedIDs.contains($0.id) } + ((try? self.load()) ?? []))
             .sorted { $0.date > $1.date }
     }
 
@@ -34,6 +36,25 @@ final class TransactionStore: TransactionProviding {
         transactions.removeAll { identifiers.contains($0.id) }
         transactions.append(contentsOf: newTransactions)
         self.defaults.set(try JSONEncoder().encode(transactions), forKey: self.key)
+    }
+
+    func delete(id: Transaction.ID) throws {
+        let remaining = try self.load().filter { $0.id != id }
+        var deletedIDs = try self.deletedSampleIDs()
+        if self.sampleProvider.transactions().contains(where: { $0.id == id }) {
+            deletedIDs.insert(id)
+        }
+        // Prepare both values before mutating storage so decoding or encoding
+        // failures leave the existing history intact.
+        let remainingData = try JSONEncoder().encode(remaining)
+        let deletedData = try JSONEncoder().encode(deletedIDs)
+        self.defaults.set(deletedData, forKey: self.deletedSampleIDsKey)
+        self.defaults.set(remainingData, forKey: self.key)
+    }
+
+    private func deletedSampleIDs() throws -> Set<Transaction.ID> {
+        guard let data = self.defaults.data(forKey: self.deletedSampleIDsKey) else { return [] }
+        return try JSONDecoder().decode(Set<Transaction.ID>.self, from: data)
     }
 
     private func load() throws -> [Transaction] {

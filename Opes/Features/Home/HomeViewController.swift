@@ -171,7 +171,8 @@ final class HomeViewController: TabRootViewController {
 
         let details = TransactionDetailsViewController(
             transaction: transaction,
-            transactionProvider: self.transactionProvider
+            transactionProvider: self.transactionProvider,
+            onDelete: { [weak self] in self?.refreshTiles() }
         )
 
         self.presentCard(Self.makeCard(for: details), from: row)

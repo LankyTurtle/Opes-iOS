@@ -22,6 +22,13 @@ Manual entry supports an AUD amount, money in/out, date, merchant/description,
 and a required account. Saved transactions also appear in Home and the
 transaction providers used by forecasts and pay cycles.
 
+Swipe left on a transaction to reveal **Delete**, or swipe fully to delete it.
+Deletion works within search results and persists across launches, including for
+sample transactions. Home and forecasts use the updated history when reopened.
+The bottom of the transaction detail screen also offers **Delete Transaction**.
+Deleting there returns to the list or closes the Home detail card and refreshes
+the visible history.
+
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name and institution to save an account locally and select it immediately.

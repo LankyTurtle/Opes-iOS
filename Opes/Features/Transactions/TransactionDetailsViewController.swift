@@ -10,6 +10,9 @@ final class TransactionDetailsViewController: UITableViewController {
     private let transaction: Transaction
     private let accountProvider: any AccountProviding
     private let transactionProvider: any TransactionProviding
+    private let transactionStore: TransactionStore
+    private let onDelete: (() -> Void)?
+    private var isDeleting = false
 
     /// The account the money moved through, when the transaction names one that is
     /// still on file.
@@ -19,6 +22,18 @@ final class TransactionDetailsViewController: UITableViewController {
     private let summaryView = TransactionSummaryView()
 
     private lazy var summaryRow = FormHostCell(view: self.summaryView)
+
+    private lazy var deleteRow: UITableViewCell = {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        var content = cell.defaultContentConfiguration()
+        content.text = "Delete Transaction"
+        content.textProperties.color = .systemRed
+        content.textProperties.alignment = .center
+        content.textProperties.numberOfLines = 0
+        cell.contentConfiguration = content
+        cell.accessibilityTraits = .button
+        return cell
+    }()
 
     /// A row the user can follow, so it is a plain cell with a disclosure rather
     /// than one of the form rows, which don't highlight.
@@ -38,11 +53,15 @@ final class TransactionDetailsViewController: UITableViewController {
     init(
         transaction: Transaction,
         accountProvider: any AccountProviding = AccountStore.shared,
-        transactionProvider: any TransactionProviding = TransactionStore.shared
+        transactionProvider: any TransactionProviding = TransactionStore.shared,
+        transactionStore: TransactionStore = .shared,
+        onDelete: (() -> Void)? = nil
     ) {
         self.transaction = transaction
         self.accountProvider = accountProvider
         self.transactionProvider = transactionProvider
+        self.transactionStore = transactionStore
+        self.onDelete = onDelete
         self.account = accountProvider.accounts().first { $0.id == transaction.accountID }
         self.merchantHistory = MerchantHistory.make(
             for: transaction.merchant,
@@ -113,7 +132,32 @@ final class TransactionDetailsViewController: UITableViewController {
             )
         }
 
+        sections.append(DetailsSection(rows: [self.deleteRow]))
         return sections
+    }
+
+    private func deleteTransaction() {
+        guard !self.isDeleting else { return }
+        self.isDeleting = true
+        do {
+            try self.transactionStore.delete(id: self.transaction.id)
+            if let navigationController = self.navigationController,
+               navigationController.viewControllers.first !== self {
+                self.onDelete?()
+                navigationController.popViewController(animated: true)
+            } else {
+                // Home presents details in a card. Keep its source row intact
+                // until dismissal finishes, then refresh the recent transactions.
+                self.dismiss(animated: true, completion: self.onDelete)
+            }
+        } catch {
+            self.isDeleting = false
+            let alert = UIAlertController(
+                title: "Couldn’t delete transaction", message: error.localizedDescription, preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            self.present(alert, animated: true)
+        }
     }
 
     private static func makeDetailRow(title: String, value: String) -> UITableViewCell {
@@ -154,6 +198,11 @@ final class TransactionDetailsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+
+        if self.sections[indexPath.section].rows[indexPath.row] === self.deleteRow {
+            self.deleteTransaction()
+            return
+        }
 
         guard
             let account = self.account,

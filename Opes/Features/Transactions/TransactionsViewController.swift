@@ -12,7 +12,7 @@ final class TransactionsViewController: TabRootViewController {
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
-        collectionViewLayout: Self.makeLayout()
+        collectionViewLayout: self.makeLayout()
     )
 
     private lazy var dataSource = self.makeDataSource()
@@ -185,6 +185,12 @@ final class TransactionsViewController: TabRootViewController {
         self.apply(query: "", animated: false)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        self.transactions = self.transactionProvider.transactions()
+        self.apply(query: self.searchBar.text ?? "", animated: false)
+    }
+
     private func showManualEntry() {
         self.dismissSearchKeyboard()
         let editor = TransactionEditorViewController(accounts: self.accountProvider.accounts()) { [weak self] transaction in
@@ -348,7 +354,7 @@ final class TransactionsViewController: TabRootViewController {
         }
     }
 
-    private func apply(query: String, animated: Bool) {
+    private func apply(query: String, animated: Bool, completion: (() -> Void)? = nil) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = trimmed.isEmpty
             ? self.transactions
@@ -357,13 +363,43 @@ final class TransactionsViewController: TabRootViewController {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Transaction>()
         snapshot.appendSections([.main])
         snapshot.appendItems(matches, toSection: .main)
-        self.dataSource.apply(snapshot, animatingDifferences: animated)
+        self.dataSource.apply(snapshot, animatingDifferences: animated, completion: completion)
 
+        self.emptyLabel.text = trimmed.isEmpty ? "No transactions" : "No matching transactions"
         self.emptyLabel.isHidden = !matches.isEmpty
     }
 
-    private static func makeLayout() -> UICollectionViewLayout {
-        let configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+    private func makeLayout() -> UICollectionViewLayout {
+        var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+        configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
+            guard let self, let transaction = self.dataSource.itemIdentifier(for: indexPath) else { return nil }
+            // Capture the transaction's identity from the displayed snapshot,
+            // including when search has filtered or reordered the visible rows.
+            let delete = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
+                guard let self else {
+                    completion(false)
+                    return
+                }
+                do {
+                    try self.transactionStore.delete(id: transaction.id)
+                    self.transactions.removeAll { $0.id == transaction.id }
+                    self.apply(query: self.searchBar.text ?? "", animated: true) {
+                        completion(true)
+                    }
+                } catch {
+                    completion(false)
+                    let alert = UIAlertController(
+                        title: "Couldn’t delete transaction", message: error.localizedDescription, preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
+            delete.image = UIImage(systemName: "trash")
+            let actions = UISwipeActionsConfiguration(actions: [delete])
+            actions.performsFirstActionWithFullSwipe = true
+            return actions
+        }
         return UICollectionViewCompositionalLayout.list(using: configuration)
     }
 
@@ -431,7 +467,8 @@ extension TransactionsViewController: UICollectionViewDelegate {
             TransactionDetailsViewController(
                 transaction: transaction,
                 accountProvider: self.accountProvider,
-                transactionProvider: self.transactionProvider
+                transactionProvider: self.transactionProvider,
+                transactionStore: self.transactionStore
             ),
             animated: true
         )

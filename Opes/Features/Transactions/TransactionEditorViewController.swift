@@ -43,7 +43,7 @@ final class TransactionEditorViewController: UITableViewController {
             field.adjustsFontForContentSizeCategory = true
             field.textAlignment = .right
             field.clearButtonMode = .whileEditing
-            field.addTarget(self, action: #selector(self.validate), for: .editingChanged)
+            field.addTarget(self, action: #selector(self.validateForm), for: .editingChanged)
         }
         self.merchantField.placeholder = "Name or description"
         self.merchantField.accessibilityLabel = "Merchant or description"
@@ -67,7 +67,7 @@ final class TransactionEditorViewController: UITableViewController {
         self.accountButton.titleLabel?.lineBreakMode = .byTruncatingTail
         self.accountButton.accessibilityLabel = "Account"
         self.configureAccountMenu()
-        self.validate()
+        self.validateForm()
     }
 
     private func configureAccountMenu() {
@@ -91,7 +91,7 @@ final class TransactionEditorViewController: UITableViewController {
         )
     }
 
-    @objc private func validate() {
+    @objc private func validateForm() {
         self.navigationItem.rightBarButtonItem?.isEnabled =
             !(self.merchantField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && TransactionAmount.parse(self.amountField.text ?? "") != nil

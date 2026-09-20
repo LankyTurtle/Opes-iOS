@@ -76,6 +76,9 @@ final class TransactionsViewController: TabRootViewController {
         // `keyboardDismissMode`, so scrolling animates the close like every other route.
         self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
+        // Identify the list explicitly so the floating search control doesn't
+        // interfere with the navigation bar's scroll-edge behavior.
+        self.setContentScrollView(self.collectionView, for: .top)
 
         self.emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         self.emptyLabel.font = .preferredFont(forTextStyle: .body)
@@ -185,6 +188,8 @@ final class TransactionsViewController: TabRootViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        self.navigationController?.hidesBarsOnSwipe = false
+        self.navigationController?.setNavigationBarHidden(false, animated: animated)
         self.transactions = self.transactionProvider.transactions()
         self.apply(query: self.searchBar.text ?? "", animated: false)
     }

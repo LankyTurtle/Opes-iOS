@@ -9,7 +9,7 @@ final class AccountEditorViewController: UITableViewController {
     private let numberField = UITextField()
     private let bsbField = UITextField()
     private let institutionField = UITextField()
-    private lazy var nameRow = FormRowCell(title: "Account name", control: self.nameField, stretchesControl: true)
+    private lazy var nameRow = FormRowCell(title: "Name", control: self.nameField, stretchesControl: true)
     private lazy var typeRow = FormRowCell(title: "Type", control: self.typeButton, stretchesControl: true)
     private lazy var numberRow = FormRowCell(title: "Number", control: self.numberField, stretchesControl: true)
     private lazy var bsbRow = FormRowCell(title: "BSB", control: self.bsbField, stretchesControl: true)
@@ -49,7 +49,7 @@ final class AccountEditorViewController: UITableViewController {
             field.addTarget(self, action: #selector(self.updateSaveButton), for: .editingChanged)
         }
         self.nameField.placeholder = "Everyday account"
-        self.nameField.accessibilityLabel = "Account name"
+        self.nameField.accessibilityLabel = "Name"
         self.numberField.placeholder = "Account or card number"
         self.numberField.accessibilityLabel = "Account number"
         self.bsbField.placeholder = "000-000"

@@ -85,14 +85,16 @@ final class AccountEditorViewController: UITableViewController {
         self.type = type
         self.configureTypeMenu()
         self.updateSaveButton()
-        guard hadBSB != type.hasBSB, let numberIndex = self.rows.firstIndex(of: self.numberRow) else { return }
-        // The BSB row sits directly below the number row whenever it's shown.
-        let indexPath = IndexPath(row: numberIndex + 1, section: 0)
-        if type.hasBSB {
-            self.tableView.insertRows(at: [indexPath], with: .automatic)
-        } else {
-            if self.bsbField.isFirstResponder { self.bsbField.resignFirstResponder() }
-            self.tableView.deleteRows(at: [indexPath], with: .automatic)
+        guard hadBSB != type.hasBSB else { return }
+        if self.bsbField.isFirstResponder { self.bsbField.resignFirstResponder() }
+        // Animated row insertion and deletion briefly squares off the inset
+        // group's rounded corners. Cross-fading between two fully laid-out
+        // states keeps the corners rounded throughout.
+        UIView.transition(
+            with: self.tableView, duration: 0.25, options: [.transitionCrossDissolve, .allowUserInteraction]
+        ) {
+            self.tableView.reloadData()
+            self.tableView.layoutIfNeeded()
         }
     }
 

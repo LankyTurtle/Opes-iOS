@@ -33,8 +33,8 @@ final class AccountStore {
         self.defaults.set(remainingData, forKey: self.key)
     }
 
-    /// Spaces and hyphens in `number` and `bsb` are ignored. The BSB may be
-    /// blank, and is dropped for card accounts.
+    /// Spaces and hyphens in `number` and `bsb` are ignored. The BSB is
+    /// required when the type has one, and dropped for card accounts.
     @discardableResult
     func create(
         name: String, type: AccountType, number: String, bsb: String?, institution: String
@@ -46,8 +46,8 @@ final class AccountStore {
             throw AccountError.invalidNumber
         }
         var validBSB: String?
-        if type.hasBSB, let bsb, !bsb.trimmingCharacters(in: .whitespaces).isEmpty {
-            guard let digits = Self.digits(bsb), digits.count == 6 else { throw AccountError.invalidBSB }
+        if type.hasBSB {
+            guard let digits = Self.digits(bsb ?? ""), digits.count == 6 else { throw AccountError.invalidBSB }
             validBSB = digits
         }
         var accounts = try self.load()
@@ -76,7 +76,7 @@ final class AccountStore {
             switch self {
             case .missingDetails: "Enter an account name and institution."
             case .invalidNumber: "Enter an account number of up to 20 digits."
-            case .invalidBSB: "Enter a six-digit BSB, or leave it blank."
+            case .invalidBSB: "Enter a six-digit BSB."
             }
         }
     }

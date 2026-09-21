@@ -39,9 +39,9 @@ For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name, type, number, and institution to save an account locally and select it
 immediately. Types are Transaction, Savings, Credit Card, Charge Card, Personal
-Loan, Home Loan, and Investment Loan. An optional six-digit BSB can be entered
-for every type except credit and charge cards. Accounts saved before these
-fields existed load as Transaction accounts with no number.
+Loan, Home Loan, and Investment Loan. A six-digit BSB is required for every
+type except credit and charge cards, which have none. Accounts saved before these
+fields existed load as Transaction accounts with no number or BSB.
 New accounts also appear in Accounts, Home, forecasts, and pay-cycle selectors.
 Their current balance starts at zero; importing history does not derive a balance.
 Selecting the file does not parse or import it. Tap **Upload** to validate and

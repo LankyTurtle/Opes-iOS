@@ -52,7 +52,7 @@ final class AccountEditorViewController: UITableViewController {
         self.nameField.accessibilityLabel = "Account name"
         self.numberField.placeholder = "Account or card number"
         self.numberField.accessibilityLabel = "Account number"
-        self.bsbField.placeholder = "Optional"
+        self.bsbField.placeholder = "000-000"
         self.bsbField.accessibilityLabel = "BSB"
         for field in [self.numberField, self.bsbField] {
             field.keyboardType = .numberPad
@@ -84,6 +84,7 @@ final class AccountEditorViewController: UITableViewController {
         let hadBSB = self.type.hasBSB
         self.type = type
         self.configureTypeMenu()
+        self.updateSaveButton()
         guard hadBSB != type.hasBSB, let numberIndex = self.rows.firstIndex(of: self.numberRow) else { return }
         // The BSB row sits directly below the number row whenever it's shown.
         let indexPath = IndexPath(row: numberIndex + 1, section: 0)
@@ -96,8 +97,11 @@ final class AccountEditorViewController: UITableViewController {
     }
 
     @objc private func updateSaveButton() {
-        self.navigationItem.rightBarButtonItem?.isEnabled = [self.nameField, self.numberField, self.institutionField]
-            .allSatisfy { !($0.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let requiredFields = [self.nameField, self.numberField, self.institutionField]
+            + (self.type.hasBSB ? [self.bsbField] : [])
+        self.navigationItem.rightBarButtonItem?.isEnabled = requiredFields.allSatisfy {
+            !($0.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     @objc private func saveAccount() {

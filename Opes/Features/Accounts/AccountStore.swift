@@ -33,20 +33,51 @@ final class AccountStore {
         self.defaults.set(remainingData, forKey: self.key)
     }
 
+    /// Spaces and hyphens in `number` and `bsb` are ignored. The BSB may be
+    /// blank, and is dropped for card accounts.
     @discardableResult
-    func create(name: String, institution: String) throws -> Account {
+    func create(
+        name: String, type: AccountType, number: String, bsb: String?, institution: String
+    ) throws -> Account {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let institution = institution.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, !institution.isEmpty else { throw AccountError.missingDetails }
+        guard let number = Self.digits(number), (1...20).contains(number.count) else {
+            throw AccountError.invalidNumber
+        }
+        var validBSB: String?
+        if type.hasBSB, let bsb, !bsb.trimmingCharacters(in: .whitespaces).isEmpty {
+            guard let digits = Self.digits(bsb), digits.count == 6 else { throw AccountError.invalidBSB }
+            validBSB = digits
+        }
         var accounts = try self.load()
-        let account = Account(id: UUID(), name: name, institution: institution, balance: 0)
+        let account = Account(
+            id: UUID(), name: name, type: type, number: number, bsb: validBSB,
+            institution: institution, balance: 0
+        )
         accounts.append(account)
         self.defaults.set(try JSONEncoder().encode(accounts), forKey: self.key)
         return account
     }
 
+    /// The digits in `text` once spaces and hyphens are removed, or `nil` if
+    /// anything else remains.
+    private static func digits(_ text: String) -> String? {
+        let stripped = text.filter { $0 != " " && $0 != "-" }
+        return stripped.allSatisfy { ("0"..."9").contains($0) } ? stripped : nil
+    }
+
     enum AccountError: LocalizedError {
         case missingDetails
-        var errorDescription: String? { "Enter an account name and institution." }
+        case invalidNumber
+        case invalidBSB
+
+        var errorDescription: String? {
+            switch self {
+            case .missingDetails: "Enter an account name and institution."
+            case .invalidNumber: "Enter an account number of up to 20 digits."
+            case .invalidBSB: "Enter a six-digit BSB, or leave it blank."
+            }
+        }
     }
 }

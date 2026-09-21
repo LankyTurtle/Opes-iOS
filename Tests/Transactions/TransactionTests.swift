@@ -103,13 +103,30 @@ enum TransactionTests {
         let accounts = AccountStore(defaults: defaults)
         try self.expect(store.transactions().isEmpty, "Fresh install starts without transactions")
         try self.expect(try accounts.load().isEmpty, "Fresh install starts without accounts")
-        let created = try accounts.create(name: " Everyday ", institution: " Test Bank ")
-        let second = try accounts.create(name: "Savings", institution: "Test Bank")
+        let created = try accounts.create(name: " Everyday ", type: .transaction, number: "1234 5678", bsb: "062-000", institution: " Test Bank ")
+        let second = try accounts.create(name: "Savings", type: .savings, number: "87654321", bsb: " ", institution: "Test Bank")
         try self.expect(created.name == "Everyday" && created.institution == "Test Bank", "Trim account details")
+        try self.expect(created.type == .transaction && created.number == "12345678" && created.bsb == "062000", "Normalise number and BSB")
+        try self.expect(second.type == .savings && second.bsb == nil, "A blank BSB is saved as none")
+        let card = try accounts.create(name: "Card", type: .creditCard, number: "4111-1111-1111-1111", bsb: "062000", institution: "Bank")
+        try self.expect(card.number == "4111111111111111" && card.bsb == nil, "Card accounts never keep a BSB")
+        try self.rejects("Reject an empty account number") { _ = try accounts.create(name: "Everyday", type: .transaction, number: " - ", bsb: nil, institution: "Bank") }
+        try self.rejects("Reject a non-numeric account number") { _ = try accounts.create(name: "Everyday", type: .homeLoan, number: "12AB", bsb: nil, institution: "Bank") }
+        try self.rejects("Reject an over-long account number") { _ = try accounts.create(name: "Everyday", type: .transaction, number: String(repeating: "1", count: 21), bsb: nil, institution: "Bank") }
+        try self.rejects("Reject a short BSB") { _ = try accounts.create(name: "Everyday", type: .personalLoan, number: "1", bsb: "06200", institution: "Bank") }
+        try self.rejects("Reject a non-numeric BSB") { _ = try accounts.create(name: "Everyday", type: .investmentLoan, number: "1", bsb: "06200X", institution: "Bank") }
+        try accounts.delete(id: card.id, transactionStore: store)
+        let legacyID = UUID()
+        let legacySuite = "LegacyAccountTests.\(UUID().uuidString)"
+        let legacyDefaults = UserDefaults(suiteName: legacySuite)!
+        defer { legacyDefaults.removePersistentDomain(forName: legacySuite) }
+        legacyDefaults.set(Data(#"[{"id":"\#(legacyID)","name":"Old","institution":"Bank","balance":5}]"#.utf8), forKey: "accounts.v1")
+        let legacy = try AccountStore(defaults: legacyDefaults).load()
+        try self.expect(legacy == [Account(id: legacyID, name: "Old", type: .transaction, number: "", bsb: nil, institution: "Bank", balance: 5)], "Accounts saved before type, number, and BSB still load")
         try self.expect(try AccountStore(defaults: defaults).load() == [created, second], "Accounts and stable IDs survive reload")
         try self.expect(created.id != second.id, "Accounts at the same institution remain distinct")
-        try self.rejects("Reject an empty account name") { _ = try accounts.create(name: "  ", institution: "Bank") }
-        try self.rejects("Reject an empty institution") { _ = try accounts.create(name: "Everyday", institution: "  ") }
+        try self.rejects("Reject an empty account name") { _ = try accounts.create(name: "  ", type: .transaction, number: "12345678", bsb: nil, institution: "Bank") }
+        try self.rejects("Reject an empty institution") { _ = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: nil, institution: "  ") }
         let firstAccountRows = try TransactionCSVParser.parse(bytes, accountID: created.id, institution: created.institution)
         let secondAccountRows = try TransactionCSVParser.parse(bytes, accountID: second.id, institution: second.institution)
         try self.expect(firstAccountRows.allSatisfy { $0.accountID == created.id }, "Import links to newly created account")
@@ -143,7 +160,7 @@ enum TransactionTests {
         for transaction in store.transactions() { try store.delete(id: transaction.id) }
         try self.expect(reloaded.transactions().isEmpty, "Deleting all transactions produces empty history")
         defaults.set(Data("broken".utf8), forKey: "accounts.v1")
-        try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", institution: "Bank") }
+        try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", type: .transaction, number: "12345678", bsb: nil, institution: "Bank") }
         try self.expect(defaults.data(forKey: "accounts.v1") == Data("broken".utf8), "Corrupt account data retained for recovery")
         defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
         try self.rejects("Do not overwrite corrupted history") { try store.save(signed[0]) }
@@ -157,8 +174,8 @@ enum TransactionTests {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let accounts = AccountStore(defaults: defaults)
-        let target = try accounts.create(name: "Everyday", institution: "Bank")
-        let other = try accounts.create(name: "Everyday", institution: "Bank")
+        let target = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: nil, institution: "Bank")
+        let other = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: nil, institution: "Bank")
         func transaction(_ accountID: UUID) -> Transaction {
             Transaction(id: UUID(), merchant: "Shop", date: .now, amount: -10, accountID: accountID)
         }
@@ -178,7 +195,7 @@ enum TransactionTests {
         try self.expect(reopenedTransactions.transactions().count == 1, "Repeated account deletion is harmless")
         try self.rejects("Stale form cannot save to deleted account") { try transactions.save(savedTarget) }
         try self.rejects("New transaction ID cannot revive deleted account history") { try transactions.save(transaction(target.id)) }
-        let emptyAccount = try accounts.create(name: "Empty", institution: "Bank")
+        let emptyAccount = try accounts.create(name: "Empty", type: .transaction, number: "12345678", bsb: nil, institution: "Bank")
         try accounts.delete(id: emptyAccount.id, transactionStore: transactions)
         try self.expect(try accounts.load() == [other], "Delete account with no linked transactions")
 

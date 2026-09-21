@@ -3,6 +3,9 @@ import UIKit
 struct AccountPreview: Hashable, Identifiable {
     let id: UUID
     let name: String
+    let type: AccountType
+    let number: String
+    let bsb: String?
     /// Positive for credit, negative for debt.
     let balance: Decimal
     let institution: String
@@ -30,7 +33,8 @@ extension AccountStore: AccountProviding {
 extension AccountPreview {
     init(account: Account) {
         self.init(
-            id: account.id, name: account.name, balance: account.balance,
+            id: account.id, name: account.name, type: account.type, number: account.number,
+            bsb: account.bsb, balance: account.balance,
             institution: account.institution,
             institutionLogo: UIImage(systemName: "building.columns.fill") ?? UIImage()
         )

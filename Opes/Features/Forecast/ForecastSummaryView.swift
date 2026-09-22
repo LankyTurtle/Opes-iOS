@@ -57,15 +57,18 @@ final class ForecastSummaryView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func show(title: String, forecast: Forecast) {
+    /// - Parameter includesProjection: `false` shows the balance alone, for a
+    ///   screen that presents the projection elsewhere.
+    func show(title: String, forecast: Forecast, includesProjection: Bool = true) {
         let balance = ForecastFormatter.currency(forecast.startingBalance)
-        let projection = Self.projectionDescription(for: forecast)
+        let projection = includesProjection ? Self.projectionDescription(for: forecast) : nil
 
         self.titleLabel.text = title
         self.balanceLabel.text = balance
         self.projectionLabel.text = projection
+        self.projectionLabel.isHidden = projection == nil
 
-        self.accessibilityLabel = "\(title), \(balance). \(projection)"
+        self.accessibilityLabel = ["\(title), \(balance).", projection].compactMap { $0 }.joined(separator: " ")
     }
 
     private static func projectionDescription(for forecast: Forecast) -> String {

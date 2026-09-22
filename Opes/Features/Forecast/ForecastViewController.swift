@@ -22,7 +22,7 @@ final class ForecastViewController: UITableViewController {
         var summaryTitle: String {
             switch self {
             case .netWorth: "Total across all accounts"
-            case .account(let account): account.institution
+            case .account: "Balance"
             }
         }
     }
@@ -83,11 +83,12 @@ final class ForecastViewController: UITableViewController {
             return (cell, account)
         }
 
-    /// Built once: an account's number and BSB, where it has them. Accounts saved
-    /// before these were recorded have neither, and so no rows.
+    /// Built once: an account's institution, then its number and BSB where it has
+    /// them. Accounts saved before these were recorded have neither.
     private lazy var detailRows: [UITableViewCell] = {
         guard case .account(let account) = self.subject else { return [] }
         let details: [(title: String, value: String?)] = [
+            ("Institution", account.institution),
             ("Number", account.number.isEmpty ? nil : account.number),
             ("BSB", account.formattedBSB),
         ]
@@ -213,7 +214,12 @@ final class ForecastViewController: UITableViewController {
             over: self.horizon
         )
 
-        self.summaryView.show(title: self.subject.summaryTitle, forecast: self.forecast)
+        // An account's tile is its balance alone; the Forecast section below
+        // carries the projection.
+        let includesProjection = if case .netWorth = self.subject { true } else { false }
+        self.summaryView.show(
+            title: self.subject.summaryTitle, forecast: self.forecast, includesProjection: includesProjection
+        )
 
         self.chartView.accentColor = Self.accentColor(for: self.forecast)
         self.chartView.show(self.forecast, placeholder: "Not enough information to draw a forecast yet.")

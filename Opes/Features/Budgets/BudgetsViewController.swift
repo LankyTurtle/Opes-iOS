@@ -1,9 +1,9 @@
 import UIKit
 
 final class BudgetsViewController: TabRootViewController {
-    private enum Section {
+    private enum Section: Hashable {
         case overview
-        case categories
+        case bucket(Bucket.ID)
     }
 
     private enum Item: Hashable {
@@ -11,7 +11,9 @@ final class BudgetsViewController: TabRootViewController {
         case budget(BudgetPreview)
     }
 
-    private var budgets: [BudgetPreview] = []
+    /// One per bucket with budgeted categories, in section order after the overview.
+    private var groups: [BudgetGroup] = []
+    private var budgets: [BudgetPreview] { self.groups.flatMap(\.budgets) }
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -31,6 +33,12 @@ final class BudgetsViewController: TabRootViewController {
         self.collectionView.backgroundColor = .clear
         self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
+
+        let categoriesItem = UIBarButtonItem(
+            image: UIImage(systemName: "tag"), style: .plain, target: self, action: #selector(self.showCategories)
+        )
+        categoriesItem.accessibilityLabel = "Manage buckets and categories"
+        self.navigationItem.rightBarButtonItem = categoriesItem
 
         NSLayoutConstraint.activate([
             self.collectionView.topAnchor.constraint(equalTo: self.view.topAnchor),
@@ -76,13 +84,26 @@ final class BudgetsViewController: TabRootViewController {
 
     private func applySnapshot() {
         let previousItems = Set(self.dataSource.snapshot().itemIdentifiers)
-        self.budgets = BudgetPreview.current(transactions: TransactionStore.shared.transactions())
+        self.groups = BudgetPreview.current(
+            transactions: TransactionStore.shared.transactions(), tree: CategoryStore.shared.tree()
+        )
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
-        snapshot.appendSections([.overview, .categories])
+        snapshot.appendSections([.overview])
         snapshot.appendItems([.overview], toSection: .overview)
-        snapshot.appendItems(self.budgets.map(Item.budget), toSection: .categories)
+        for group in self.groups {
+            snapshot.appendSections([.bucket(group.bucket.id)])
+            snapshot.appendItems(group.budgets.map(Item.budget), toSection: .bucket(group.bucket.id))
+        }
         snapshot.reconfigureItems(snapshot.itemIdentifiers.filter { previousItems.contains($0) })
         self.dataSource.apply(snapshot, animatingDifferences: false)
+        // Reconfiguring items leaves headers alone, and a bucket keeps its
+        // section when its total or name changes.
+        let kind = UICollectionView.elementKindSectionHeader
+        for indexPath in self.collectionView.indexPathsForVisibleSupplementaryElements(ofKind: kind) {
+            if let header = self.collectionView.supplementaryView(forElementKind: kind, at: indexPath) as? UICollectionViewListCell {
+                self.configureHeader(header, section: indexPath.section)
+            }
+        }
     }
 
     private func startPeriodRefreshTimer() {
@@ -115,9 +136,19 @@ final class BudgetsViewController: TabRootViewController {
         self.refreshPeriodTrackers()
     }
 
+    /// Budgets come from each category's monthly budget, so they are set there.
+    /// Coming back refreshes the list in `viewWillAppear`.
+    @objc private func showCategories() {
+        self.navigationController?.pushViewController(BucketsViewController(), animated: true)
+    }
+
+    /// Each bucket's section has its name above it; the overview has none.
     private static func makeLayout() -> UICollectionViewLayout {
-        let configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
-        return UICollectionViewCompositionalLayout.list(using: configuration)
+        UICollectionViewCompositionalLayout { sectionIndex, environment in
+            var configuration = UICollectionLayoutListConfiguration(appearance: .insetGrouped)
+            configuration.headerMode = sectionIndex == 0 ? .none : .supplementary
+            return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: environment)
+        }
     }
 
     private func makeDataSource() -> UICollectionViewDiffableDataSource<Section, Item> {
@@ -157,7 +188,13 @@ final class BudgetsViewController: TabRootViewController {
             ])
         }
 
-        return UICollectionViewDiffableDataSource<Section, Item>(
+        let headerRegistration = UICollectionView.SupplementaryRegistration<UICollectionViewListCell>(
+            elementKind: UICollectionView.elementKindSectionHeader
+        ) { [weak self] header, _, indexPath in
+            self?.configureHeader(header, section: indexPath.section)
+        }
+
+        let dataSource = UICollectionViewDiffableDataSource<Section, Item>(
             collectionView: self.collectionView
         ) { collectionView, indexPath, item in
             collectionView.dequeueConfiguredReusableCell(
@@ -166,6 +203,19 @@ final class BudgetsViewController: TabRootViewController {
                 item: item
             )
         }
+        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+            collectionView.dequeueConfiguredReusableSupplementary(using: headerRegistration, for: indexPath)
+        }
+        return dataSource
+    }
+
+    private func configureHeader(_ header: UICollectionViewListCell, section: Int) {
+        guard self.groups.indices.contains(section - 1) else { return }
+        let group = self.groups[section - 1]
+        var content = UIListContentConfiguration.prominentInsetGroupedHeader()
+        content.text = group.bucket.name
+        content.secondaryText = "\(group.spent.formatted(.currency(code: "AUD"))) spent of \(group.limit.formatted(.currency(code: "AUD")))"
+        header.contentConfiguration = content
     }
 }
 
@@ -343,7 +393,7 @@ private final class BudgetCategoryRowView: UIView {
     func configure(with budget: BudgetPreview, style: BudgetChartStyle) {
         self.iconView.image = UIImage(systemName: budget.category.symbolName)
         self.iconView.tintColor = budget.statusColor
-        self.categoryLabel.text = budget.category.rawValue
+        self.categoryLabel.text = budget.category.name
         self.detailLabel.text = "\(budget.formattedSpent) of \(budget.formattedLimit) · \(budget.periodUnit.rawValue)"
         self.statusLabel.text = budget.formattedStatus
         self.statusLabel.textColor = budget.statusColor

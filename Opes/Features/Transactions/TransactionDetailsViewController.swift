@@ -109,8 +109,9 @@ final class TransactionDetailsViewController: UITableViewController {
         self.headlineView.show(self.transaction)
         var content = self.categoriesRow.defaultContentConfiguration()
         content.text = "Categories"
+        let tree = CategoryStore.shared.tree()
         let allocations = self.transaction.allocations.map {
-            "\($0.category.rawValue): \($0.amount.formatted(.currency(code: "AUD")))"
+            "\(tree.name(of: $0.path)):\($0.amount.formatted(.currency(code: "AUD")))"
         }
         var lines = allocations
         if self.transaction.unallocatedAmount > 0 {

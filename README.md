@@ -57,9 +57,30 @@ it goes back to the description, which is never changed. Search matches the
 summary, description, or reference. In lists the summary stays on one line and
 ends in an ellipsis when it is too long for the row.
 
+Categories are grouped into buckets. A new install starts with three:
+
+- **Income**: Salary, Interest, Refunds, Other income
+- **Living**: Groceries, Housing, Utilities, Transport, Health, Insurance
+- **Lifestyle**: Dining, Entertainment, Shopping, Travel, Subscriptions
+
 Any transaction, debit or credit, can be given one category or split across
-several, up to its amount. In budgets, categorised credits such as refunds
-reduce that category's spending, never below zero.
+several, up to its amount. Each allocation can be narrowed to one of the
+category's subcategories, which counts toward the category. In budgets,
+categorised credits such as refunds reduce that category's spending, never
+below zero. The transaction filter lists categories under their buckets;
+choosing one includes its subcategories.
+
+The tag button on Budgets opens **Buckets**. From there you can add, rename,
+and delete buckets, categories, and subcategories, the starter ones included.
+Category names are unique across all buckets. Subcategory names are unique
+within their category. A category's screen sets its bucket and an optional
+monthly budget. Only categories with a budget appear in Budgets, grouped under
+their bucket with its total. The starter budgets are Groceries $650, Transport
+$250, Health $300, Dining $300, Entertainment $150, and Shopping $400.
+Deleting a subcategory keeps its transactions in the category. Deleting a
+category that is in use asks whether to move its transactions to another
+category or leave them uncategorised. Deleting a bucket with categories asks
+whether to move them to another bucket or delete them too.
 
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
@@ -121,7 +142,7 @@ Upload/preview/import flow, Dynamic Type, and VoiceOver on a device or simulator
 - `App` contains the app and scene delegates.
 - `Enums` contains the app-wide enumerations, including the tab definitions.
 - `Navigation` contains the root tab bar controller.
-- `Features` contains the home, accounts, transactions, budgets, forecast, pay
+- `Features` contains the home, accounts, transactions, categories, budgets, forecast, pay
   cycle, and profile screens.
 - `Resources` contains the asset catalogue.
 - `Shared` contains reusable presentation components.

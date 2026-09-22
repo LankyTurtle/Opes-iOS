@@ -28,6 +28,13 @@ final class TransactionStore: TransactionProviding {
         self.defaults.set(try JSONEncoder().encode(transactions), forKey: self.key)
     }
 
+    /// Moves or drops allocations across every transaction, for when a
+    /// category or subcategory is deleted.
+    func reassignAllocations(_ transform: (CategoryPath) -> CategoryPath?) throws {
+        let transactions = try self.load().map { $0.reassigningAllocations(transform) }
+        self.defaults.set(try JSONEncoder().encode(transactions), forKey: self.key)
+    }
+
     func delete(id: Transaction.ID) throws {
         let remaining = try self.load().filter { $0.id != id }
         let remainingData = try JSONEncoder().encode(remaining)

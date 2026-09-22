@@ -3,15 +3,13 @@ import UIKit
 /// Budget presentation with spending calculated from saved category allocations,
 /// net of categorised credits such as refunds.
 struct BudgetPreview: Hashable, Identifiable {
-    typealias Category = TransactionCategory
-
-    let category: Category
+    let category: TransactionCategory
     let spent: Decimal
     let limit: Decimal
     let periodUnit: BudgetPeriodUnit
 
-    var id: Category {
-        self.category
+    var id: TransactionCategory.ID {
+        self.category.id
     }
 
     var remaining: Decimal {
@@ -53,16 +51,28 @@ struct BudgetPreview: Hashable, Identifiable {
 }
 
 extension BudgetPreview {
-    static func current(transactions: [Transaction], now: Date = .now, calendar: Calendar = .current) -> [BudgetPreview] {
+    /// This month's budgets, one per category with a monthly budget, grouped by
+    /// bucket. Buckets with no budgeted categories, like Income usually, are left out.
+    static func current(transactions: [Transaction], tree: CategoryTree, now: Date = .now,
+                        calendar: Calendar = .current) -> [BudgetGroup] {
         guard let period = calendar.dateInterval(of: .month, for: now) else { return [] }
         let totals = CategorySpending.totals(in: transactions, during: period)
-        // Retain the existing monthly limits until budget editing is available.
-        let limits: [(Category, Decimal)] = [
-            (.groceries, 650), (.dining, 300), (.transport, 250),
-            (.shopping, 400), (.entertainment, 150), (.health, 300),
-        ]
-        return limits.map { category, limit in
-            BudgetPreview(category: category, spent: totals[category, default: 0], limit: limit, periodUnit: .monthly)
+        return tree.buckets.compactMap { bucket in
+            let budgets = bucket.categories.compactMap { category in
+                category.monthlyBudget.map { limit in
+                    BudgetPreview(category: category, spent: totals[category.id, default: 0], limit: limit, periodUnit: .monthly)
+                }
+            }
+            return budgets.isEmpty ? nil : BudgetGroup(bucket: bucket, budgets: budgets)
         }
     }
+}
+
+/// A bucket's budgets, shown under its name with their combined total.
+struct BudgetGroup: Hashable {
+    let bucket: Bucket
+    let budgets: [BudgetPreview]
+
+    var spent: Decimal { self.budgets.reduce(Decimal.zero) { $0 + $1.spent } }
+    var limit: Decimal { self.budgets.reduce(Decimal.zero) { $0 + $1.limit } }
 }

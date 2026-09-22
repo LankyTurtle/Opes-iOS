@@ -148,8 +148,9 @@ final class TransactionEditorViewController: UITableViewController {
 
     @objc private func validateForm() {
         self.categoryButton.isEnabled = TransactionAmount.parse(self.amountField.text ?? "") != nil
+        let tree = CategoryStore.shared.tree()
         self.categoryButton.setTitle(
-            self.allocations.isEmpty ? "Uncategorised" : self.allocations.map { $0.category.rawValue }.joined(separator: ", "),
+            self.allocations.isEmpty ? "Uncategorised" : self.allocations.map { tree.name(of: $0.path) }.joined(separator: ", "),
             for: .normal
         )
         self.navigationItem.rightBarButtonItem?.isEnabled =

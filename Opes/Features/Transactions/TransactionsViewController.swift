@@ -9,6 +9,9 @@ final class TransactionsViewController: TabRootViewController {
     private let transactionProvider: any TransactionProviding
     private var transactions: [Transaction]
     private let transactionStore: TransactionStore
+    private let categoryStore: CategoryStore
+    private var categoryTree: CategoryTree
+    private var categoryNamesChanged = false
     private var categoryFilter = TransactionCategoryFilter()
     private lazy var filterItem: UIBarButtonItem = {
         let menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] completion in
@@ -49,11 +52,14 @@ final class TransactionsViewController: TabRootViewController {
     init(
         accountProvider: any AccountProviding = AccountStore.shared,
         transactionProvider: any TransactionProviding = TransactionStore.shared,
-        transactionStore: TransactionStore = .shared
+        transactionStore: TransactionStore = .shared,
+        categoryStore: CategoryStore = .shared
     ) {
         self.accountProvider = accountProvider
         self.transactionProvider = transactionProvider
         self.transactionStore = transactionStore
+        self.categoryStore = categoryStore
+        self.categoryTree = categoryStore.tree()
         self.transactions = transactionProvider.transactions()
         super.init(nibName: nil, bundle: nil)
     }
@@ -186,6 +192,13 @@ final class TransactionsViewController: TabRootViewController {
         self.navigationController?.hidesBarsOnSwipe = false
         self.navigationController?.setNavigationBarHidden(false, animated: animated)
         self.transactions = self.transactionProvider.transactions()
+        let tree = self.categoryStore.tree()
+        if tree != self.categoryTree {
+            self.categoryTree = tree
+            self.categoryNamesChanged = true
+            // Drop filters for categories deleted elsewhere.
+            self.categoryFilter.categories.formIntersection(tree.categories.map(\.id))
+        }
         self.apply(query: self.searchBar.text ?? "", animated: false)
     }
 
@@ -381,6 +394,13 @@ final class TransactionsViewController: TabRootViewController {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Transaction>()
         snapshot.appendSections([.main])
         snapshot.appendItems(matches, toSection: .main)
+        if self.categoryNamesChanged {
+            // A renamed category leaves its transactions unchanged, so their
+            // rows wouldn't otherwise redraw.
+            let shown = Set(self.dataSource.snapshot().itemIdentifiers)
+            snapshot.reconfigureItems(matches.filter { shown.contains($0) })
+            self.categoryNamesChanged = false
+        }
         self.dataSource.apply(snapshot, animatingDifferences: animated, completion: completion)
 
         var empty = UIContentUnavailableConfiguration.empty()
@@ -408,15 +428,18 @@ final class TransactionsViewController: TabRootViewController {
     }
 
     private func categoryFilterActions() -> [UIMenuElement] {
-        var actions: [UIMenuElement] = TransactionCategory.allCases.map { category in
-            UIAction(title: category.rawValue, image: UIImage(systemName: category.symbolName),
-                     state: self.categoryFilter.categories.contains(category) ? .on : .off) { [weak self] _ in
-                guard let self else { return }
-                if !self.categoryFilter.categories.insert(category).inserted {
-                    self.categoryFilter.categories.remove(category)
+        // One inline group per bucket. Choosing a category includes its subcategories.
+        var actions: [UIMenuElement] = self.categoryTree.buckets.filter { !$0.categories.isEmpty }.map { bucket in
+            UIMenu(title: bucket.name, options: .displayInline, children: bucket.categories.map { category in
+                UIAction(title: category.name, image: UIImage(systemName: category.symbolName),
+                         state: self.categoryFilter.categories.contains(category.id) ? .on : .off) { [weak self] _ in
+                    guard let self else { return }
+                    if !self.categoryFilter.categories.insert(category.id).inserted {
+                        self.categoryFilter.categories.remove(category.id)
+                    }
+                    self.apply(query: self.searchBar.text ?? "", animated: true)
                 }
-                self.apply(query: self.searchBar.text ?? "", animated: true)
-            }
+            })
         }
         actions.append(UIAction(title: "Uncategorised",
                                 state: self.categoryFilter.includesUncategorised ? .on : .off) { [weak self] _ in
@@ -466,14 +489,15 @@ final class TransactionsViewController: TabRootViewController {
 
     private func makeDataSource() -> UICollectionViewDiffableDataSource<Section, Transaction> {
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Transaction> {
-            cell, _, transaction in
+            [weak self] cell, _, transaction in
+            let tree = self?.categoryTree ?? CategoryTree(buckets: [])
             var content = UIListContentConfiguration.subtitleCell()
             content.text = transaction.summary
             // One line, cut with an ellipsis at whatever width the row has. The
             // full summary is in details, and VoiceOver still reads all of it.
             content.textProperties.numberOfLines = 1
             content.textProperties.lineBreakMode = .byTruncatingTail
-            var categories = transaction.allocations.map { $0.category.rawValue }
+            var categories = transaction.allocations.map { tree.name(of: $0.path) }
             if transaction.unallocatedAmount > 0 { categories.append("Uncategorised") }
             content.secondaryText = "\(transaction.formattedDate) · \(categories.joined(separator: ", "))"
             content.secondaryTextProperties.numberOfLines = 0

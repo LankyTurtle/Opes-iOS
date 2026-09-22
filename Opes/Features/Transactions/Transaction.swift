@@ -31,11 +31,29 @@ struct Transaction: Codable, Hashable, Identifiable {
         return copy
     }
 
+    /// A copy with each allocation moved to the path `transform` gives, or
+    /// dropped when it gives nil. Allocations that land on the same path are
+    /// combined, so the copy stays valid.
+    func reassigningAllocations(_ transform: (CategoryPath) -> CategoryPath?) -> Transaction {
+        var merged: [TransactionAllocation] = []
+        for allocation in self.allocations {
+            guard let path = transform(allocation.path) else { continue }
+            if let index = merged.firstIndex(where: { $0.path == path }) {
+                merged[index] = TransactionAllocation(path: path, amount: merged[index].amount + allocation.amount)
+            } else {
+                merged.append(TransactionAllocation(path: path, amount: allocation.amount))
+            }
+        }
+        var copy = self
+        copy.categoryAllocations = merged.isEmpty ? nil : merged
+        return copy
+    }
+
     func validateAllocations() throws {
         guard !self.allocations.isEmpty else { return }
         let total = self.allocations.reduce(Decimal.zero) { $0 + $1.amount }
         guard total <= abs(self.amount),
-              Set(self.allocations.map(\.category)).count == self.allocations.count,
+              Set(self.allocations.map(\.path)).count == self.allocations.count,
               self.allocations.allSatisfy({ allocation in
                   var amount = allocation.amount
                   var rounded = Decimal()

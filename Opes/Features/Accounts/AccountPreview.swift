@@ -22,6 +22,11 @@ struct AccountPreview: Hashable, Identifiable {
         return self.type.hasBSB ? self.number : "•••• \(self.number.suffix(4))"
     }
 
+    /// The BSB as it's usually written, e.g. `062-000`.
+    var formattedBSB: String? {
+        self.bsb.map { "\($0.prefix(3))-\($0.suffix(3))" }
+    }
+
     /// The institution, followed by the account number when there is one.
     var subtitle: String {
         [self.institution, self.displayNumber].compactMap { $0 }.joined(separator: " · ")

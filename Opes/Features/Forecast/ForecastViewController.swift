@@ -83,6 +83,22 @@ final class ForecastViewController: UITableViewController {
             return (cell, account)
         }
 
+    /// Built once: an account's number and BSB, where it has them. Accounts saved
+    /// before these were recorded have neither, and so no rows.
+    private lazy var detailRows: [UITableViewCell] = {
+        guard case .account(let account) = self.subject else { return [] }
+        let details: [(title: String, value: String?)] = [
+            ("Number", account.number.isEmpty ? nil : account.number),
+            ("BSB", account.formattedBSB),
+        ]
+        return details.compactMap { detail -> UITableViewCell? in
+            guard let value = detail.value else { return nil }
+            let label = Self.makeValueLabel()
+            label.text = value
+            return FormRowCell(title: detail.title, control: label, stretchesControl: true)
+        }
+    }()
+
     init(
         subject: Subject,
         accountProvider: any AccountProviding = AccountStore.shared,
@@ -129,8 +145,11 @@ final class ForecastViewController: UITableViewController {
     }
 
     private func buildSections() {
-        var sections: [ForecastSection] = [
-            ForecastSection(rows: [self.summaryRow]),
+        var sections: [ForecastSection] = [ForecastSection(rows: [self.summaryRow])]
+        if !self.detailRows.isEmpty {
+            sections.append(ForecastSection(header: "Details", rows: self.detailRows))
+        }
+        sections += [
             ForecastSection(header: "Forecast", control: self.horizonControlView),
             ForecastSection(rows: [self.chartRow]),
             ForecastSection(

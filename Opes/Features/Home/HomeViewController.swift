@@ -53,6 +53,10 @@ final class HomeViewController: TabRootViewController {
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
+        // The tiles are updated in place rather than reconfigured, so a tile
+        // that gains rows (recent transactions after an import) would otherwise
+        // keep the height it was first sized at and squash its content.
+        self.collectionView.selfSizingInvalidation = .enabledIncludingConstraints
         self.collectionView.delegate = self
         self.view.addSubview(self.collectionView)
 

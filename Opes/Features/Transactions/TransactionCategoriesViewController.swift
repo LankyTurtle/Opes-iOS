@@ -50,7 +50,7 @@ final class TransactionCategoriesViewController: UITableViewController {
             if let allocation = allocations.first(where: { $0.category == category }) {
                 field.text = allocation.amount.formatted(.number.grouping(.never))
             }
-            field.addTarget(self, action: #selector(self.validate), for: .editingChanged)
+            field.addTarget(self, action: #selector(self.validateForm), for: .editingChanged)
             self.fields.append(field)
             self.amountRows.append(FormRowCell(title: category.rawValue, control: field, stretchesControl: true))
         }
@@ -58,7 +58,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         self.statusLabel.adjustsFontForContentSizeCategory = true
         self.statusLabel.numberOfLines = 0
         self.statusLabel.accessibilityTraits = .updatesFrequently
-        self.validate()
+        self.validateForm()
     }
 
     @objc private func changeMode() {
@@ -70,7 +70,7 @@ final class TransactionCategoriesViewController: UITableViewController {
             }
         }
         self.tableView.reloadData()
-        self.validate()
+        self.validateForm()
     }
 
     private func draft() throws -> [TransactionAllocation] {
@@ -91,7 +91,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         return allocations
     }
 
-    @objc private func validate() {
+    @objc private func validateForm() {
         do {
             let allocations = try self.draft()
             let total = allocations.reduce(Decimal.zero) { $0 + $1.amount }
@@ -140,7 +140,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         guard indexPath.section == 1, self.mode.selectedSegmentIndex == 0 else { return }
         self.selectedCategory = indexPath.row == 0 ? nil : self.categories[indexPath.row - 1]
         self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
-        self.validate()
+        self.validateForm()
     }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         section == 1 ? "Expense: \((-self.transaction.amount).formatted(.currency(code: "AUD")))" : nil

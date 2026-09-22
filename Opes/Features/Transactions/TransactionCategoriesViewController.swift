@@ -11,7 +11,7 @@ final class TransactionCategoriesViewController: UITableViewController {
     private var fields: [UITextField] = []
     private var amountRows: [UITableViewCell] = []
     private let statusLabel = UILabel()
-    private lazy var modeRow = FormHostCell(view: self.mode)
+    private lazy var modeView = FormControlView(control: self.mode)
     private lazy var statusRow = FormHostCell(view: self.statusLabel)
 
     init(transaction: Transaction, allocations: [TransactionAllocation]? = nil,
@@ -120,10 +120,13 @@ final class TransactionCategoriesViewController: UITableViewController {
 
     override func numberOfSections(in tableView: UITableView) -> Int { 3 }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        section == 1 ? (self.mode.selectedSegmentIndex == 0 ? self.categories.count + 1 : self.categories.count) : 1
+        switch section {
+        case 0: 0
+        case 1: self.mode.selectedSegmentIndex == 0 ? self.categories.count + 1 : self.categories.count
+        default: 1
+        }
     }
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if indexPath.section == 0 { return self.modeRow }
         if indexPath.section == 2 { return self.statusRow }
         if self.mode.selectedSegmentIndex == 1 { return self.amountRows[indexPath.row] }
         let category = indexPath.row == 0 ? nil : self.categories[indexPath.row - 1]
@@ -142,8 +145,13 @@ final class TransactionCategoriesViewController: UITableViewController {
         self.tableView.reloadSections(IndexSet(integer: 1), with: .none)
         self.validateForm()
     }
+    /// The mode picker has no rows, so it sits in its section's footer: on the
+    /// grouped background rather than boxed in a cell.
+    override func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
+        section == 0 ? self.modeView : nil
+    }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        section == 1 ? "\(self.transaction.directionDescription):\(abs(self.transaction.amount).formatted(.currency(code: "AUD")))" : nil
+        section == 1 ? "\(self.transaction.directionDescription): \(abs(self.transaction.amount).formatted(.currency(code: "AUD")))" : nil
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         guard section == 1 else { return nil }

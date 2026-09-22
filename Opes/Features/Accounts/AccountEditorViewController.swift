@@ -126,7 +126,7 @@ final class AccountEditorViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell { self.rows[indexPath.row] }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        "The account’s balance starts at $0.00; importing transaction history does not set the current balance."
+        "The account’s balance starts at $0.00. Importing a Macquarie CSV sets it from the file’s Balance column; other imports leave it unchanged."
     }
 }
 

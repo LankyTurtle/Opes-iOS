@@ -49,6 +49,17 @@ final class AccountStore {
         return account
     }
 
+    func setBalance(_ balance: Decimal, for id: Account.ID) throws {
+        var accounts = try self.load()
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else { throw AccountError.notFound }
+        let account = accounts[index]
+        accounts[index] = Account(
+            id: account.id, name: account.name, type: account.type, number: account.number,
+            bsb: account.bsb, institution: account.institution, balance: balance
+        )
+        self.defaults.set(try JSONEncoder().encode(accounts), forKey: self.key)
+    }
+
     /// The digits in `text` once spaces and hyphens are removed, or `nil` if
     /// anything else remains.
     private static func digits(_ text: String) -> String? {
@@ -60,12 +71,14 @@ final class AccountStore {
         case missingDetails
         case invalidNumber
         case invalidBSB
+        case notFound
 
         var errorDescription: String? {
             switch self {
             case .missingDetails: "Enter an account name and institution."
             case .invalidNumber: "Enter an account number of up to 20 digits."
             case .invalidBSB: "Enter a six-digit BSB."
+            case .notFound: "The account no longer exists."
             }
         }
     }

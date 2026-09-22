@@ -4,12 +4,14 @@ import UniformTypeIdentifiers
 final class TransactionCSVUploadViewController: UITableViewController {
     private let accountProvider: any AccountProviding
     private var accounts: [AccountPreview]
-    private let onImport: ([Transaction]) throws -> Void
+    private let onImport: (TransactionCSVImport) throws -> Void
     private var selectedAccount: AccountPreview?
     private var fileName: String?
     private var fileData: Data?
     private var isReadingFile = false
     private var parsedTransactions: [Transaction] = []
+    /// Only meaningful while `parsedTransactions` holds the preview it came with.
+    private var closingBalance: TransactionCSVImport.ClosingBalance?
     private var isParsing = false
     private var isImporting = false
     private let accountButton = UIButton(type: .system)
@@ -17,7 +19,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
         title: "Account", control: self.accountButton, stretchesControl: true
     )
 
-    init(accountProvider: any AccountProviding, onImport: @escaping ([Transaction]) throws -> Void) {
+    init(accountProvider: any AccountProviding, onImport: @escaping (TransactionCSVImport) throws -> Void) {
         self.accountProvider = accountProvider
         self.accounts = accountProvider.accounts()
         self.onImport = onImport
@@ -121,9 +123,10 @@ final class TransactionCSVUploadViewController: UITableViewController {
                 guard let self else { return }
                 self.isParsing = false
                 switch result {
-                case .success(let transactions):
-                    self.parsedTransactions = transactions
-                    UIAccessibility.post(notification: .announcement, argument: "\(transactions.count) transactions ready to review")
+                case .success(let parsed):
+                    self.parsedTransactions = parsed.transactions
+                    self.closingBalance = parsed.closingBalance
+                    UIAccessibility.post(notification: .announcement, argument: "\(parsed.transactions.count) transactions ready to review")
                 case .failure(let error):
                     self.showError(title: "Couldn’t parse CSV", error: error)
                 }
@@ -141,7 +144,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
               self.parsedTransactions.allSatisfy({ $0.accountID == selectedAccount.id }) else { return }
         self.isImporting = true
         do {
-            try self.onImport(self.parsedTransactions)
+            try self.onImport(TransactionCSVImport(transactions: self.parsedTransactions, closingBalance: self.closingBalance))
             self.navigationController?.popViewController(animated: true)
         } catch {
             self.isImporting = false
@@ -187,7 +190,13 @@ final class TransactionCSVUploadViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         if section == 0 { return "Select the account these transactions belong to, or add a new account from the menu." }
         if section == 2 {
-            return "Previewing the first \(min(self.parsedTransactions.count, 5)) transactions. Import adds all \(self.parsedTransactions.count) to \(self.selectedAccount?.name ?? "the selected account") in AUD."
+            let balance = self.closingBalance.map {
+                " and sets its balance to \(ForecastFormatter.currency($0.amount)), unless it already has later transactions"
+            } ?? ""
+            return "Previewing the first \(min(self.parsedTransactions.count, 5)) transactions. Import adds all \(self.parsedTransactions.count) to \(self.selectedAccount?.name ?? "the selected account") in AUD\(balance)."
+        }
+        if let institution = self.selectedAccount?.institution, TransactionCSVParser.readsMacquarieExport(for: institution) {
+            return "Choose a Macquarie CSV export (up to 10 MB), then tap Upload to parse it. It needs Transaction Date, Details and Original Description columns, with Debit and Credit or an Amount column. Balance sets the account’s balance."
         }
         return "Choose a CSV (up to 10 MB), then tap Upload to parse it. Include Date, Description and Amount columns, or Debit and Credit instead of Amount. Dates use day/month/year or year-month-day. Negative amounts are money out."
     }
@@ -206,7 +215,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
                 cell.accessibilityTraits = enabled ? .button : [.button, .notEnabled]
             } else {
                 let transaction = self.parsedTransactions[indexPath.row - 1]
-                content.text = transaction.description
+                content.text = transaction.summary
                 content.secondaryText = "\(transaction.date.formatted(date: .abbreviated, time: .omitted)) · \(transaction.formattedAmount)"
                 cell.selectionStyle = .none
             }

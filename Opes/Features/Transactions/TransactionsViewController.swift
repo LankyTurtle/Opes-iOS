@@ -204,10 +204,17 @@ final class TransactionsViewController: TabRootViewController {
     private func showCSVUpload() {
         self.dismissSearchKeyboard()
         self.navigationController?.pushViewController(
-            TransactionCSVUploadViewController(accountProvider: self.accountProvider) { [weak self] transactions in
+            TransactionCSVUploadViewController(accountProvider: self.accountProvider) { [weak self] parsed in
                 guard let self else { return }
-                try self.transactionStore.save(transactions)
-                self.transactions.append(contentsOf: transactions)
+                // The balance goes first: if saving the transactions then fails,
+                // importing the file again lands on the same balance rather than
+                // duplicating history that was already saved.
+                if let balance = parsed.balance(toApplyAfter: self.transactionStore.transactions()),
+                   let accountID = parsed.transactions.first?.accountID {
+                    try AccountStore.shared.setBalance(balance, for: accountID)
+                }
+                try self.transactionStore.save(parsed.transactions)
+                self.transactions.append(contentsOf: parsed.transactions)
                 self.transactions.sort { $0.date > $1.date }
                 self.apply(query: self.searchBar.text ?? "", animated: true)
             },

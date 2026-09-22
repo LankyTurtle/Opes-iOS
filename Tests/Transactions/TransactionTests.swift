@@ -22,7 +22,7 @@ enum TransactionTests {
     }
 
     static func parse(_ csv: String) throws -> [Transaction] {
-        try TransactionCSVParser.parse(Data(csv.utf8), accountID: self.accountID, institution: "Test Bank")
+        try TransactionCSVParser.parse(Data(csv.utf8), accountID: self.accountID, institution: "Test Bank").transactions
     }
 
     static func accountFilterChecks() throws {
@@ -107,6 +107,7 @@ enum TransactionTests {
         try self.summaryChecks()
         try self.occurrenceChecks()
         try self.accountDeletionChecks()
+        try self.macquarieChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")
         try self.expect(TransactionAmount.parse(" 12.34 ", locale: au) != nil, "Manual whitespace")
@@ -127,7 +128,7 @@ enum TransactionTests {
         let currency = try self.parse("Date,Merchant,Amount\n20/09/2026,Refund,$20.00\n20/09/2026,Shop,(12.34)")
         try self.expect(currency.map(\.amount) == [20, Decimal(string: "-12.34")!], "Currency and accounting negative")
         let utf16 = "Date,Description,Amount\n20/09/2026,Shop,-1".data(using: .utf16)!
-        try self.expect(try TransactionCSVParser.parse(utf16, accountID: self.accountID, institution: "Bank").count == 1, "UTF-16 BOM")
+        try self.expect(try TransactionCSVParser.parse(utf16, accountID: self.accountID, institution: "Bank").transactions.count == 1, "UTF-16 BOM")
         try self.expect(try self.parse("\nDate,Description,Amount\n\n20/09/2026,Shop,-1\n\n").count == 1, "Blank lines")
 
         for csv in [
@@ -212,8 +213,8 @@ enum TransactionTests {
         try self.expect(created.id != second.id, "Accounts at the same institution remain distinct")
         try self.rejects("Reject an empty account name") { _ = try accounts.create(name: "  ", type: .transaction, number: "12345678", bsb: "062000", institution: "Bank") }
         try self.rejects("Reject an empty institution") { _ = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: "062000", institution: "  ") }
-        let firstAccountRows = try TransactionCSVParser.parse(bytes, accountID: created.id, institution: created.institution)
-        let secondAccountRows = try TransactionCSVParser.parse(bytes, accountID: second.id, institution: second.institution)
+        let firstAccountRows = try TransactionCSVParser.parse(bytes, accountID: created.id, institution: created.institution).transactions
+        let secondAccountRows = try TransactionCSVParser.parse(bytes, accountID: second.id, institution: second.institution).transactions
         try self.expect(firstAccountRows.allSatisfy { $0.accountID == created.id }, "Import links to newly created account")
         try self.expect(secondAccountRows.allSatisfy { $0.accountID == second.id }, "Reparsing for a different account changes every link")
         try store.save(signed)
@@ -248,6 +249,79 @@ enum TransactionTests {
         try self.rejects("Do not delete with corrupted transaction history") { try store.delete(id: signed[0].id) }
         try self.expect(defaults.data(forKey: "transactions") == Data("broken".utf8), "Corrupt history remains available for recovery")
         print("Passed \(self.checks) transaction checks.")
+    }
+
+    static func macquarieChecks() throws {
+        let header = "Transaction Date,Details,Account,Category,Subcategory,Tags,Notes,Debit,Credit,Balance,Original Description\n"
+        func parse(_ rows: String, institution: String = "Macquarie") throws -> TransactionCSVImport {
+            try TransactionCSVParser.parse(Data((header + rows).utf8), accountID: self.accountID, institution: institution)
+        }
+        func day(_ text: String) -> Date {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "dd MMM yyyy"
+            return formatter.date(from: text)!
+        }
+        // Macquarie exports newest first.
+        let newestFirst = try parse("""
+        21 Sep 2026,Woolworths,Everyday,Groceries,Supermarkets,,,45.20,,954.80,WOOLWORTHS 1234 SYDNEY AU
+        21 Sep 2026,Salary,Everyday,Income,Salary,work,Sept,,1000.00,1000.00,ACME PTY LTD PAY
+        """)
+        let rows = newestFirst.transactions
+        try self.expect(rows.map(\.description) == ["WOOLWORTHS 1234 SYDNEY AU", "ACME PTY LTD PAY"], "Macquarie Original Description is the description")
+        try self.expect(rows.map(\.summary) == ["Woolworths", "Salary"], "Macquarie Details is the summary")
+        try self.expect(rows.map(\.amount) == [Decimal(string: "-45.20")!, 1000], "Macquarie debit and credit")
+        try self.expect(rows.allSatisfy { !$0.hasTime && $0.reference == nil }, "Macquarie rows carry a date only")
+        try self.expect(rows[0].date == day("21 Sep 2026"), "Macquarie dd MMM yyyy date")
+        try self.expect(newestFirst.closingBalance == .init(amount: Decimal(string: "954.80")!, date: day("21 Sep 2026")), "Newest-first closing balance on a single day")
+
+        let oldestFirst = try parse("""
+        20 Sep 2026,Salary,Everyday,,,,,,1000.00,1000.00,ACME PTY LTD PAY
+        21 Sep 2026,Woolworths,Everyday,,,,,45.20,,954.80,WOOLWORTHS 1234 SYDNEY AU
+        """)
+        try self.expect(oldestFirst.closingBalance?.amount == Decimal(string: "954.80"), "Oldest-first closing balance")
+        let brokenChain = try parse("""
+        22 Sep 2026,Cafe,Everyday,,,,,5.00,,500.00,CAFE
+        20 Sep 2026,Shop,Everyday,,,,,10.00,,900.00,SHOP
+        """)
+        try self.expect(brokenChain.closingBalance?.amount == 500, "Dates decide when balances don't chain")
+        let sameDayBroken = try parse("""
+        22 Sep 2026,Cafe,Everyday,,,,,5.00,,500.00,CAFE
+        22 Sep 2026,Shop,Everyday,,,,,10.00,,900.00,SHOP
+        """)
+        try self.expect(sameDayBroken.closingBalance == nil, "No closing balance when the order can't be told")
+        let blankBalance = try parse("22 Sep 2026,Pending,Everyday,,,,,5.00,,,\n")
+        try self.expect(blankBalance.closingBalance == nil && blankBalance.transactions[0].description == "Pending", "Blank balance and description fall back")
+        try self.expect(blankBalance.transactions[0].summary == "Pending", "Summary matches a fallen-back description")
+        let amountColumn = try TransactionCSVParser.parse(
+            Data("Transaction Date,Details,Amount,Balance,Original Description\n22 Sep 2026,Cafe,-5.00,(12.50),CAFE\n".utf8),
+            accountID: self.accountID, institution: "Macquarie Bank"
+        )
+        try self.expect(amountColumn.transactions[0].amount == -5 && amountColumn.closingBalance?.amount == Decimal(string: "-12.50"), "Macquarie Amount column and negative balance")
+
+        try self.rejects("Macquarie needs Original Description") {
+            _ = try TransactionCSVParser.parse(Data("Transaction Date,Details,Amount\n22 Sep 2026,Cafe,-5\n".utf8), accountID: self.accountID, institution: "Macquarie")
+        }
+        try self.rejects("Macquarie dates are dd MMM yyyy") { _ = try parse("22/09/2026,Cafe,Everyday,,,,,5.00,,500.00,CAFE\n") }
+        try self.rejects("Reject an invalid balance") { _ = try parse("22 Sep 2026,Cafe,Everyday,,,,,5.00,,lots,CAFE\n") }
+        let generic = try TransactionCSVParser.parse(Data("Date,Description,Amount,Balance\n20/09/2026,Shop,-1,99\n".utf8), accountID: self.accountID, institution: "ANZ")
+        try self.expect(generic.closingBalance == nil, "Other institutions don't read a balance")
+
+        let later = Transaction(id: UUID(), description: "Later", date: day("23 Sep 2026"), amount: -1, accountID: self.accountID)
+        let sameDay = Transaction(id: UUID(), description: "Same day", date: day("21 Sep 2026").addingTimeInterval(3600), amount: -1, accountID: self.accountID)
+        let otherAccount = Transaction(id: UUID(), description: "Other", date: day("23 Sep 2026"), amount: -1, accountID: UUID())
+        try self.expect(newestFirst.balance(toApplyAfter: [sameDay, otherAccount]) == Decimal(string: "954.80"), "Balance applies over same-day and other-account history")
+        try self.expect(newestFirst.balance(toApplyAfter: [later]) == nil, "An older export doesn't wind the balance back")
+
+        let suite = "MacquarieBalanceTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let accounts = AccountStore(defaults: defaults)
+        let account = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: "182512", institution: "Macquarie")
+        try accounts.setBalance(Decimal(string: "954.80")!, for: account.id)
+        let stored = try AccountStore(defaults: defaults).load()
+        try self.expect(stored.count == 1 && stored[0].balance == Decimal(string: "954.80") && stored[0].bsb == "182512", "Setting the balance keeps the rest of the account")
+        try self.rejects("Reject a balance for a missing account") { try accounts.setBalance(1, for: UUID()) }
     }
 
     static func accountDeletionChecks() throws {

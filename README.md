@@ -64,7 +64,7 @@ Loan, Home Loan, and Investment Loan. A six-digit BSB, entered between instituti
 type except credit and charge cards, which have none; the hyphen is added as you
 type the fourth digit.
 New accounts also appear in Accounts, Home, forecasts, and pay-cycle selectors.
-Their current balance starts at zero; importing history does not derive a balance.
+Their current balance starts at zero; only a Macquarie import sets it (see below).
 Selecting the file does not parse or import it. Tap **Upload** to validate and
 parse, review the first five transactions and total count, then tap **Import**
 to save all parsed transactions linked to that account. Replacing the file or changing the account
@@ -82,10 +82,21 @@ Number`) column is saved with each transaction; blank cells mean no reference.
 Dates use `dd/MM/yyyy`, `yyyy-MM-dd`, `dd-MM-yyyy`, or `dd MMM yyyy`.
 Amounts are AUD with up to two decimal places. Quoted commas, escaped quotes,
 embedded newlines, CRLF, and a UTF-8 BOM are supported. The institution is saved
-with each imported transaction alongside the selected account's stable identifier. This is a common
-header-based format, not a set of bank-specific export adapters. Invalid files
-are rejected as a whole. Re-importing a file creates new transactions.
+with each imported transaction alongside the selected account's stable identifier.
+Invalid files are rejected as a whole. Re-importing a file creates new transactions.
 Every transaction belongs to an account.
+
+Accounts whose institution contains "Macquarie" are read as a Macquarie export
+instead: `Transaction Date` (`dd MMM yyyy`, e.g. `21 Sep 2026`), `Details`
+(saved as the Summary), `Original Description` (the Description; `Details` fills
+in where it is blank), and `Debit` and `Credit` or a signed `Amount`. `Account`,
+`Category`, `Subcategory`, `Tags`, and `Notes` are ignored for now. An optional
+`Balance` column sets the account balance to the balance after the newest
+transaction in the file. The newest row is found from the running balance, so
+same-day rows in either order work; when the balances do not chain, the order
+of the dates decides, and a single-day file whose balances do not chain leaves
+the balance alone. The balance is also left alone when the account already has
+transactions from a later day, so importing an older export never winds it back.
 
 During development, saved data is neither versioned nor migrated: a model change
 can leave existing accounts, transactions, or pay cycles unreadable, and they

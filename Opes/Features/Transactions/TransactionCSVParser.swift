@@ -1,14 +1,95 @@
 import Foundation
 
+/// What a CSV holds once parsed: the transactions, and the account balance
+/// the file ends on when it carries a running balance.
+struct TransactionCSVImport {
+    struct ClosingBalance: Equatable {
+        let amount: Decimal
+        /// The day of the transaction that left the account at `amount`.
+        let date: Date
+    }
+
+    let transactions: [Transaction]
+    let closingBalance: ClosingBalance?
+
+    /// The closing balance to give the account, or `nil` when the file has none
+    /// or the account already holds history from a later day — an older export
+    /// imported after a newer one must not wind the balance back.
+    func balance(toApplyAfter existing: [Transaction], calendar: Calendar = .autoupdatingCurrent) -> Decimal? {
+        guard let closingBalance, let accountID = self.transactions.first?.accountID else { return nil }
+        let closingDay = calendar.startOfDay(for: closingBalance.date)
+        let hasLaterHistory = existing.contains {
+            $0.accountID == accountID && calendar.startOfDay(for: $0.date) > closingDay
+        }
+        return hasLaterHistory ? nil : closingBalance.amount
+    }
+}
+
 /// A header-based CSV format, independent of bank export versions. Unsupported or
 /// invalid rows fail the whole file so a partial import never silently loses money.
+///
+/// Most banks share one generic layout. Macquarie's export is read with its own
+/// columns: Details becomes the summary, Original Description the description,
+/// and Balance sets the account's balance. Its Account, Category, Subcategory,
+/// Tags and Notes columns are ignored.
 enum TransactionCSVParser {
     struct ImportError: LocalizedError {
         let message: String
         var errorDescription: String? { self.message }
     }
 
-    static func parse(_ data: Data, accountID: UUID, institution: String) throws -> [Transaction] {
+    private struct Layout {
+        let dateColumns: [String]
+        let dateFormats: [String]
+        /// Fixed-format bank exports are parsed with the POSIX locale, so month
+        /// names don't depend on the device's region ("Sep" rather than "Sept").
+        let dateLocale: Locale
+        let dateExample: String
+        let descriptionColumns: [String]
+        /// Filled in where the description is left blank, and used as the
+        /// transaction's summary where it differs.
+        let summaryColumns: [String]
+        let balanceColumns: [String]
+        let missingColumns: String
+
+        static let generic = Layout(
+            dateColumns: ["date", "transaction date"],
+            dateFormats: ["dd/MM/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "dd MMM yyyy"],
+            dateLocale: Locale(identifier: "en_AU"),
+            dateExample: "20/09/2026 or 2026-09-20",
+            descriptionColumns: ["description", "merchant", "transaction description", "details"],
+            summaryColumns: [],
+            balanceColumns: [],
+            missingColumns: "The CSV needs Date and Description (or Merchant) columns."
+        )
+
+        static let macquarie = Layout(
+            dateColumns: ["transaction date"],
+            dateFormats: ["dd MMM yyyy"],
+            dateLocale: Locale(identifier: "en_US_POSIX"),
+            dateExample: "20 Sep 2026",
+            descriptionColumns: ["original description"],
+            summaryColumns: ["details"],
+            balanceColumns: ["balance"],
+            missingColumns: "Macquarie CSVs need Transaction Date, Details and Original Description columns."
+        )
+
+        static func `for`(institution: String) -> Layout {
+            TransactionCSVParser.readsMacquarieExport(for: institution) ? .macquarie : .generic
+        }
+    }
+
+    /// Whether an account at `institution` is imported with Macquarie's columns.
+    static func readsMacquarieExport(for institution: String) -> Bool {
+        institution.range(of: "macquarie", options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
+
+    private struct Row {
+        let transaction: Transaction
+        let balance: Decimal?
+    }
+
+    static func parse(_ data: Data, accountID: UUID, institution: String) throws -> TransactionCSVImport {
         guard data.count <= TransactionCSVAttachment.maximumFileSize else {
             throw TransactionCSVAttachment.AttachmentError.tooLarge
         }
@@ -35,10 +116,16 @@ enum TransactionCSVParser {
             }
             return matches.first
         }
-        guard let dateColumn = try column(["date", "transaction date"]),
-              let descriptionColumn = try column(["description", "merchant", "transaction description", "details"]) else {
-            throw ImportError(message: "The CSV needs Date and Description (or Merchant) columns.")
+        let layout = Layout.for(institution: institution)
+        guard let dateColumn = try column(layout.dateColumns),
+              let descriptionColumn = try column(layout.descriptionColumns) else {
+            throw ImportError(message: layout.missingColumns)
         }
+        let summaryColumn = try column(layout.summaryColumns)
+        if !layout.summaryColumns.isEmpty, summaryColumn == nil {
+            throw ImportError(message: layout.missingColumns)
+        }
+        let balanceColumn = try column(layout.balanceColumns)
         let referenceColumn = try column(["reference", "ref", "transaction reference", "receipt number"])
         let amountColumn = try column(["amount", "transaction amount"])
         let debitColumn = try column(["debit", "debit amount", "withdrawal", "withdrawals"])
@@ -49,15 +136,15 @@ enum TransactionCSVParser {
         guard amountColumn == nil || (debitColumn == nil && creditColumn == nil) else {
             throw ImportError(message: "Use either Amount or Debit and Credit columns so the transaction direction is unambiguous.")
         }
-        let formatters = ["dd/MM/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "dd MMM yyyy"].map { format in
+        let formatters = layout.dateFormats.map { format in
             let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_AU")
+            formatter.locale = layout.dateLocale
             formatter.calendar = Calendar(identifier: .gregorian)
             formatter.dateFormat = format
             formatter.isLenient = false
             return formatter
         }
-        return try rows.dropFirst().enumerated().map { offset, row in
+        let parsed = try rows.dropFirst().enumerated().map { offset, row -> Row in
             let number = offset + 2
             func invalid(_ detail: String) -> ImportError {
                 ImportError(message: "Row \(number): \(detail) No transactions have been imported.")
@@ -70,9 +157,11 @@ enum TransactionCSVParser {
                 guard let date = formatter.date(from: dateText), formatter.string(from: date) == dateText else { return nil }
                 return date
             }).first else {
-                throw invalid("Use a date such as 20/09/2026 or 2026-09-20.")
+                throw invalid("Use a date such as \(layout.dateExample).")
             }
-            let description = row[descriptionColumn].trimmingCharacters(in: .whitespacesAndNewlines)
+            let summary = summaryColumn.map { row[$0].trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            var description = row[descriptionColumn].trimmingCharacters(in: .whitespacesAndNewlines)
+            if description.isEmpty { description = summary }
             guard !description.isEmpty else { throw invalid("A description is required.") }
             let amount: Decimal
             if let amountColumn {
@@ -93,15 +182,54 @@ enum TransactionCSVParser {
                 throw invalid("An amount is required.")
             }
             guard amount != 0 else { throw invalid("The amount must be greater or less than zero.") }
+            var balance: Decimal?
+            if let balanceColumn, !row[balanceColumn].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                guard let value = self.amount(row[balanceColumn]) else {
+                    throw invalid("Enter the balance as an amount with up to two decimal places, or leave it blank.")
+                }
+                balance = value
+            }
             let reference = referenceColumn
                 .map { row[$0].trimmingCharacters(in: .whitespacesAndNewlines) }
                 .flatMap { $0.isEmpty ? nil : $0 }
-            return Transaction(
+            let transaction = Transaction(
                 id: UUID(), description: description, date: date, hasTime: false, amount: amount,
                 accountID: accountID, sourceInstitution: institution,
                 reference: reference
-            )
+            ).withSummary(summary)
+            return Row(transaction: transaction, balance: balance)
         }
+        return TransactionCSVImport(
+            transactions: parsed.map(\.transaction),
+            closingBalance: self.closingBalance(of: parsed)
+        )
+    }
+
+    /// The balance after the newest transaction in the file.
+    ///
+    /// Exports carry dates without times, so the newest transaction on the last
+    /// day is found from the running balance itself: each row's balance is the
+    /// previous row's plus its amount when the file runs oldest first, and the
+    /// next row's plus its own when it runs newest first. Where the balances
+    /// don't chain (a partial export, a pending row left blank), the order the
+    /// dates run in decides; a file that spans only one day with a broken chain
+    /// gives no balance rather than a guess.
+    private static func closingBalance(of rows: [Row]) -> TransactionCSVImport.ClosingBalance? {
+        let rows = rows.filter { $0.balance != nil }
+        guard let first = rows.first, let last = rows.last else { return nil }
+        let pairs = zip(rows, rows.dropFirst())
+        let newest: Row?
+        if pairs.allSatisfy({ earlier, later in later.balance == earlier.balance! + later.transaction.amount }) {
+            newest = last
+        } else if pairs.allSatisfy({ newer, older in newer.balance == older.balance! + newer.transaction.amount }) {
+            newest = first
+        } else if first.transaction.date != last.transaction.date {
+            newest = first.transaction.date > last.transaction.date ? first : last
+        } else {
+            newest = nil
+        }
+        guard let newest, let amount = newest.balance else { return nil }
+        return TransactionCSVImport.ClosingBalance(amount: amount, date: newest.transaction.date)
     }
 
     private static func amount(_ input: String) -> Decimal? {

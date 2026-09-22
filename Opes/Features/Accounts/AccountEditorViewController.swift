@@ -18,7 +18,7 @@ final class AccountEditorViewController: UITableViewController {
     )
     // Card accounts have no BSB, so its row is left out rather than disabled.
     private var rows: [FormRowCell] {
-        [self.nameRow, self.typeRow, self.numberRow] + (self.type.hasBSB ? [self.bsbRow] : []) + [self.institutionRow]
+        [self.nameRow, self.typeRow, self.institutionRow] + (self.type.hasBSB ? [self.bsbRow] : []) + [self.numberRow]
     }
 
     init(store: AccountStore = .shared, onSave: @escaping (AccountPreview) -> Void) {

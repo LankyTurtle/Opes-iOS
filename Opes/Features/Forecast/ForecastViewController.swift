@@ -83,21 +83,28 @@ final class ForecastViewController: UITableViewController {
             return (cell, account)
         }
 
-    /// Built once: an account's institution, then its number and BSB where it has
-    /// them. Accounts saved before these were recorded have neither.
+    /// Built once: an account's institution, then its BSB and number where it has
+    /// them. Cards have no BSB, and accounts saved before these were recorded
+    /// have neither.
     private lazy var detailRows: [UITableViewCell] = {
         guard case .account(let account) = self.subject else { return [] }
-        let details: [(title: String, value: String?)] = [
-            ("Institution", account.institution),
-            ("Number", account.number.isEmpty ? nil : account.number),
-            ("BSB", account.formattedBSB),
-        ]
-        return details.compactMap { detail -> UITableViewCell? in
-            guard let value = detail.value else { return nil }
-            let label = Self.makeValueLabel()
-            label.text = value
-            return FormRowCell(title: detail.title, control: label, stretchesControl: true)
+        var rows: [UITableViewCell] = [Self.makeDetailRow(title: "Institution", value: account.institution)]
+        if let bsb = account.formattedBSB {
+            rows.append(Self.makeDetailRow(title: "BSB", value: bsb))
         }
+        if let numberRow = self.numberRow {
+            rows.append(numberRow)
+        }
+        return rows
+    }()
+
+    private let numberLabel = ForecastViewController.makeValueLabel()
+    /// A card number shows only its last four digits until the row is tapped.
+    private var isNumberRevealed = false
+    private lazy var numberRow: FormRowCell? = {
+        guard case .account(let account) = self.subject, !account.number.isEmpty else { return nil }
+        self.updateNumberLabel()
+        return FormRowCell(title: "Number", control: self.numberLabel, stretchesControl: true)
     }()
 
     init(
@@ -326,6 +333,26 @@ final class ForecastViewController: UITableViewController {
     /// Enough to show the shape of the repeats without turning into a statement.
     private static let shownRecurringLimit = 6
 
+    private static func makeDetailRow(title: String, value: String) -> UITableViewCell {
+        let label = self.makeValueLabel()
+        label.text = value
+        return FormRowCell(title: title, control: label, stretchesControl: true)
+    }
+
+    /// Shows the full number, or a card's last four digits while it's hidden.
+    private func updateNumberLabel() {
+        guard case .account(let account) = self.subject else { return }
+        let isCard = !account.type.hasBSB
+        let isMasked = isCard && !self.isNumberRevealed
+        self.numberLabel.text = isMasked ? account.displayNumber : account.number
+        // VoiceOver would read the mask as a run of bullets.
+        self.numberLabel.accessibilityLabel = isMasked ? "Ending in \(account.number.suffix(4))" : nil
+        self.numberLabel.accessibilityHint = isCard
+            ? (isMasked ? "Double-tap to show the full number." : "Double-tap to hide the number.")
+            : nil
+        self.numberLabel.accessibilityTraits = isCard ? [.staticText, .button] : .staticText
+    }
+
     private static func makeValueLabel() -> UILabel {
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .body)
@@ -368,6 +395,12 @@ final class ForecastViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
 
         let row = self.sections[indexPath.section].rows[indexPath.row]
+        if row === self.numberRow, case .account(let account) = self.subject, !account.type.hasBSB {
+            self.isNumberRevealed.toggle()
+            self.updateNumberLabel()
+            return
+        }
+
         guard let account = self.accountRows.first(where: { $0.cell === row })?.account else {
             return
         }

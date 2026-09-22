@@ -85,10 +85,28 @@ enum TransactionTests {
         try self.rejects("Reject ambiguous reference columns") { _ = try self.parse("Date,Description,Ref,Reference,Amount\n20/09/2026,Shop,1,2,-1") }
     }
 
+    static func occurrenceChecks() throws {
+        let au = Locale(identifier: "en_AU")
+        let sydney = TimeZone(identifier: "Australia/Sydney")!
+        let imported = try self.parse("Date,Description,Amount\n20/09/2026,Shop,-1")[0]
+        try self.expect(!imported.hasTime, "CSV dates carry no time")
+        try self.expect(imported.formattedOccurrence(locale: au) == "Sun, 20 Sep 2026", "Date-only transactions show just the day")
+        try self.expect(imported.directionDescription == "Debit", "Money out is a debit")
+        var components = DateComponents(year: 2026, month: 9, day: 5, hour: 15, minute: 45)
+        components.timeZone = sydney
+        let manual = Transaction(id: UUID(), merchant: "Pay", date: Calendar(identifier: .gregorian).date(from: components)!, amount: 10, accountID: UUID())
+        let occurrence = manual.formattedOccurrence(locale: au, timeZone: sydney)
+        try self.expect(manual.hasTime && occurrence.hasPrefix("Sat, 05 Sep 2026, 3:45"), "Manual transactions show the day and time: \(occurrence)")
+        try self.expect(manual.directionDescription == "Credit", "Money in is a credit")
+        let legacy = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(imported).replacingTimeRecorded())
+        try self.expect(!legacy.hasTime, "Older imports at midnight read as having no time")
+    }
+
     static func main() throws {
         try self.bsbInputChecks()
         try self.accountFilterChecks()
         try self.displayDescriptionChecks()
+        try self.occurrenceChecks()
         try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")
@@ -291,5 +309,14 @@ enum TransactionTests {
         try self.rejects("Reject cascade with corrupt transaction account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
         try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts && defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Failed cascade preserves both stores")
         defaults.set(goodDeletedTransactionAccounts, forKey: "transactionDeletedAccounts.v1")
+    }
+}
+
+private extension Data {
+    /// Strips the time flag, as history saved before it existed would lack it.
+    func replacingTimeRecorded() throws -> Data {
+        var object = try JSONSerialization.jsonObject(with: self) as! [String: Any]
+        object["timeRecorded"] = nil
+        return try JSONSerialization.data(withJSONObject: object)
     }
 }

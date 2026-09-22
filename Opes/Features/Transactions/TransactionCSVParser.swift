@@ -99,7 +99,7 @@ enum TransactionCSVParser {
             return Transaction(
                 id: UUID(), merchant: merchant, date: date, amount: amount,
                 accountID: accountID, sourceInstitution: institution,
-                reference: reference
+                reference: reference, hasTime: false
             )
         }
     }

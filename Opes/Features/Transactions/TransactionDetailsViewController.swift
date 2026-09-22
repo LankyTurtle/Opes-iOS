@@ -83,8 +83,8 @@ final class TransactionDetailsViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // The name is already the bar’s title; a large one repeating it directly
-        // above the same name on the card reads as a stutter.
+        // The card below is the headline; a large title above it would compete
+        // with it for attention.
         self.navigationItem.largeTitleDisplayMode = .never
         self.tableView.keyboardDismissMode = .interactive
 
@@ -135,8 +135,6 @@ final class TransactionDetailsViewController: UITableViewController {
             self.displayDescriptionRow,
             Self.makeDetailRow(title: "Description", value: self.transaction.merchant),
             Self.makeDetailRow(title: "Reference", value: self.transaction.reference ?? "None"),
-            Self.makeDetailRow(title: "Date", value: self.transaction.formattedFullDate),
-            Self.makeDetailRow(title: "Time", value: self.transaction.formattedTime),
         ]
 
         if let accountRow = self.accountRow, let account = self.account {
@@ -312,12 +310,12 @@ private struct MerchantHistory {
     }
 }
 
-/// The headline of the details screen: the merchant, what the transaction did to
-/// the balance, and which way the money went.
+/// The headline of the details screen: whether it was a debit or a credit, how
+/// much moved, and when.
 private final class TransactionSummaryView: UIView {
-    private let merchantLabel = UILabel()
-    private let amountLabel = UILabel()
     private let directionLabel = UILabel()
+    private let amountLabel = UILabel()
+    private let dateLabel = UILabel()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -325,10 +323,10 @@ private final class TransactionSummaryView: UIView {
         // The list cell draws the card background and corners at the system radius.
         self.backgroundColor = .clear
 
-        self.merchantLabel.font = .preferredFont(forTextStyle: .subheadline)
-        self.merchantLabel.adjustsFontForContentSizeCategory = true
-        self.merchantLabel.textColor = .secondaryLabel
-        self.merchantLabel.numberOfLines = 0
+        self.directionLabel.font = .preferredFont(forTextStyle: .subheadline)
+        self.directionLabel.adjustsFontForContentSizeCategory = true
+        self.directionLabel.textColor = .secondaryLabel
+        self.directionLabel.numberOfLines = 0
 
         self.amountLabel.font = DesignTokens.tileValueFont
         self.amountLabel.adjustsFontForContentSizeCategory = true
@@ -338,20 +336,20 @@ private final class TransactionSummaryView: UIView {
         self.amountLabel.adjustsFontSizeToFitWidth = true
         self.amountLabel.minimumScaleFactor = 0.5
 
-        self.directionLabel.font = .preferredFont(forTextStyle: .footnote)
-        self.directionLabel.adjustsFontForContentSizeCategory = true
-        self.directionLabel.textColor = .secondaryLabel
-        self.directionLabel.numberOfLines = 0
+        self.dateLabel.font = .preferredFont(forTextStyle: .footnote)
+        self.dateLabel.adjustsFontForContentSizeCategory = true
+        self.dateLabel.textColor = .secondaryLabel
+        self.dateLabel.numberOfLines = 0
 
         let stack = UIStackView(arrangedSubviews: [
-            self.merchantLabel,
-            self.amountLabel,
             self.directionLabel,
+            self.amountLabel,
+            self.dateLabel,
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
         stack.spacing = DesignTokens.captionSpacing
-        stack.setCustomSpacing(DesignTokens.labelSpacing, after: self.merchantLabel)
+        stack.setCustomSpacing(DesignTokens.labelSpacing, after: self.directionLabel)
         self.addSubview(stack)
 
         self.isAccessibilityElement = true
@@ -370,18 +368,20 @@ private final class TransactionSummaryView: UIView {
     }
 
     func show(_ transaction: Transaction) {
-        let amount = ForecastFormatter.signedCurrency(transaction.amount)
+        // Debit or Credit already says which way the money went, so the amount
+        // doesn't repeat it with a sign.
+        let amount = ForecastFormatter.currency(abs(transaction.amount))
+        let occurrence = transaction.formattedOccurrence()
 
-        self.merchantLabel.text = transaction.displayName
+        self.directionLabel.text = transaction.directionDescription
         self.amountLabel.text = amount
         // Money in is picked out the way the forecast picks out a rise. Money out
         // is the ordinary case and stays in the label colour, so a screen of
         // everyday spending isn't a wall of red.
         self.amountLabel.textColor = transaction.isMoneyIn ? .systemTeal : .label
-        self.directionLabel.text = transaction.directionDescription
+        self.dateLabel.text = occurrence
 
-        self.accessibilityLabel =
-            "\(transaction.displayName), \(amount), \(transaction.directionDescription)"
+        self.accessibilityLabel = "\(transaction.directionDescription), \(amount), \(occurrence)"
     }
 }
 

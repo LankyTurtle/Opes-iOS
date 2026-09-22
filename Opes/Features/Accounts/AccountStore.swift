@@ -4,7 +4,6 @@ final class AccountStore {
     static let shared = AccountStore()
     private let defaults: UserDefaults
     private let key = "accounts"
-    private let deletedIDsKey = "deletedAccounts"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -15,21 +14,11 @@ final class AccountStore {
         return try JSONDecoder().decode([Account].self, from: data)
     }
 
-    func deletedAccountIDs() throws -> Set<Account.ID> {
-        guard let data = self.defaults.data(forKey: self.deletedIDsKey) else { return [] }
-        return try JSONDecoder().decode(Set<Account.ID>.self, from: data)
-    }
-
     func delete(id: Account.ID, transactionStore: TransactionStore) throws {
-        let remaining = try self.load().filter { $0.id != id }
-        var deletedIDs = try self.deletedAccountIDs()
-        deletedIDs.insert(id)
-        let remainingData = try JSONEncoder().encode(remaining)
-        let deletedData = try JSONEncoder().encode(deletedIDs)
-        // Validate and encode account state before deleting linked history. All
-        // throwing work finishes before the final account writes.
+        let remainingData = try JSONEncoder().encode(try self.load().filter { $0.id != id })
+        // Linked history goes first, so a failure leaves the account in place
+        // rather than orphaning its transactions.
         try transactionStore.delete(accountID: id)
-        self.defaults.set(deletedData, forKey: self.deletedIDsKey)
         self.defaults.set(remainingData, forKey: self.key)
     }
 

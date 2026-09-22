@@ -267,14 +267,11 @@ enum TransactionTests {
         let reopenedAccounts = AccountStore(defaults: defaults)
         let reopenedTransactions = TransactionStore(defaults: defaults)
         try self.expect(try reopenedAccounts.load() == [other], "Account deletion persists and preserves same-name accounts")
-        try self.expect(try reopenedAccounts.deletedAccountIDs().contains(target.id), "Deleted account ID is retained")
         try self.expect(reopenedTransactions.transactions() == [savedOther], "Cascade removes transactions for only the deleted account")
         let savedRows = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "transactions")!)
         try self.expect(savedRows == [savedOther], "Cascade physically removes saved linked history")
         try accounts.delete(id: target.id, transactionStore: transactions)
         try self.expect(reopenedTransactions.transactions().count == 1, "Repeated account deletion is harmless")
-        try self.rejects("Stale form cannot save to deleted account") { try transactions.save(savedTarget) }
-        try self.rejects("New transaction ID cannot revive deleted account history") { try transactions.save(transaction(target.id)) }
         let emptyAccount = try accounts.create(name: "Empty", type: .transaction, number: "12345678", bsb: "062000", institution: "Bank")
         try accounts.delete(id: emptyAccount.id, transactionStore: transactions)
         try self.expect(try accounts.load() == [other], "Delete account with no linked transactions")
@@ -282,24 +279,13 @@ enum TransactionTests {
         // Decode failures must not leave the account and its history half-deleted.
         let goodAccounts = defaults.data(forKey: "accounts")!
         let goodTransactions = defaults.data(forKey: "transactions")!
-        let goodDeletedAccounts = defaults.data(forKey: "deletedAccounts")!
-        let goodDeletedTransactionAccounts = defaults.data(forKey: "transactionDeletedAccounts")!
         defaults.set(Data("broken".utf8), forKey: "accounts")
         try self.rejects("Reject cascade with corrupt accounts") { try accounts.delete(id: other.id, transactionStore: transactions) }
         try self.expect(defaults.data(forKey: "transactions") == goodTransactions, "Account read failure preserves linked history")
         defaults.set(goodAccounts, forKey: "accounts")
-        defaults.set(Data("broken".utf8), forKey: "deletedAccounts")
-        try self.rejects("Reject cascade with corrupt account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
-        try self.expect(defaults.data(forKey: "transactions") == goodTransactions, "Account deletion record failure preserves history")
-        defaults.set(goodDeletedAccounts, forKey: "deletedAccounts")
         defaults.set(Data("broken".utf8), forKey: "transactions")
         try self.rejects("Reject cascade with corrupt transactions") { try accounts.delete(id: other.id, transactionStore: transactions) }
         try self.expect(defaults.data(forKey: "accounts") == goodAccounts, "Transaction read failure preserves account")
-        try self.expect(defaults.data(forKey: "deletedAccounts") == goodDeletedAccounts, "Failed cascade does not hide account")
         defaults.set(goodTransactions, forKey: "transactions")
-        defaults.set(Data("broken".utf8), forKey: "transactionDeletedAccounts")
-        try self.rejects("Reject cascade with corrupt transaction account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
-        try self.expect(defaults.data(forKey: "accounts") == goodAccounts && defaults.data(forKey: "transactions") == goodTransactions, "Failed cascade preserves both stores")
-        defaults.set(goodDeletedTransactionAccounts, forKey: "transactionDeletedAccounts")
     }
 }

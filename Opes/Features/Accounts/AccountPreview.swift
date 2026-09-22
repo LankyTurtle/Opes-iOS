@@ -41,9 +41,7 @@ protocol AccountProviding {
 
 extension AccountStore: AccountProviding {
     func accounts() -> [AccountPreview] {
-        let deletedIDs = (try? self.deletedAccountIDs()) ?? []
-        return ((try? self.load()) ?? []).map { AccountPreview(account: $0) }
-            .filter { !deletedIDs.contains($0.id) }
+        ((try? self.load()) ?? []).map { AccountPreview(account: $0) }
     }
 }
 

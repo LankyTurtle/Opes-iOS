@@ -135,4 +135,18 @@ extension AccountEditorViewController: UITextFieldDelegate {
         textField.resignFirstResponder()
         return true
     }
+
+    func textField(
+        _ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String
+    ) -> Bool {
+        guard textField === self.bsbField else { return true }
+        let edit = BSBInput.edit(textField.text ?? "", range: range, replacement: string)
+        textField.text = edit.text
+        if let caret = textField.position(from: textField.beginningOfDocument, offset: edit.cursor) {
+            textField.selectedTextRange = textField.textRange(from: caret, to: caret)
+        }
+        // Setting the text directly doesn't send .editingChanged.
+        self.updateSaveButton()
+        return false
+    }
 }

@@ -48,7 +48,8 @@ Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name, type, number, and institution to save an account locally and select it
 immediately. Types are Transaction, Savings, Credit Card, Charge Card, Personal
 Loan, Home Loan, and Investment Loan. A six-digit BSB is required for every
-type except credit and charge cards, which have none. Accounts saved before these
+type except credit and charge cards, which have none; the hyphen is added as you
+type the fourth digit. Accounts saved before these
 fields existed load as Transaction accounts with no number or BSB.
 New accounts also appear in Accounts, Home, forecasts, and pay-cycle selectors.
 Their current balance starts at zero; importing history does not derive a balance.

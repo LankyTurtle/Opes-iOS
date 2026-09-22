@@ -46,7 +46,28 @@ enum TransactionTests {
         try self.expect(!filter.isActive, "Toggling every choice off clears the filter")
     }
 
+    static func bsbInputChecks() throws {
+        func edit(_ text: String, _ location: Int, _ length: Int, _ replacement: String) -> (text: String, cursor: Int) {
+            BSBInput.edit(text, range: NSRange(location: location, length: length), replacement: replacement)
+        }
+        var typed = ""
+        var steps: [String] = []
+        for digit in "062000" {
+            typed = edit(typed, (typed as NSString).length, 0, String(digit)).text
+            steps.append(typed)
+        }
+        try self.expect(steps == ["0", "06", "062", "062-0", "062-00", "062-000"], "Hyphen appears with the fourth digit")
+        try self.expect(edit("062-000", 7, 0, "1") == ("062-000", 7), "Stop at six digits")
+        try self.expect(edit("06", 2, 0, "a") == ("06", 2), "Ignore non-digits")
+        try self.expect(edit("062-0", 4, 1, "") == ("062", 3), "Deleting the fourth digit removes the hyphen")
+        try self.expect(edit("062-000", 3, 1, "") == ("060-00", 2), "Backspacing the hyphen deletes the digit before it")
+        try self.expect(edit("", 0, 0, "062 000") == ("062-000", 7), "Pasted BSB is reformatted")
+        try self.expect(edit("062-000", 1, 0, "9") == ("096-200", 2), "Caret stays after a digit inserted mid-way")
+        try self.expect(edit("062-000", 3, 0, "9") == ("062-900", 5), "Caret moves past the hyphen after the fourth digit")
+    }
+
     static func main() throws {
+        try self.bsbInputChecks()
         try self.accountFilterChecks()
         try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")

@@ -4,11 +4,13 @@ $testBinary = Join-Path ([System.IO.Path]::GetTempPath()) ('opes-transactions-' 
 $sources = @(
     'Tests/Transactions/Support.swift',
     'Tests/Transactions/TransactionTests.swift',
+    'Tests/Transactions/CategoryChecks.swift',
     'Opes/Features/Accounts/Account.swift',
     'Opes/Features/Accounts/AccountStore.swift',
     'Opes/Features/Accounts/AccountFilter.swift',
     'Opes/Features/Accounts/BSBInput.swift',
     'Opes/Features/Transactions/Transaction.swift',
+    'Opes/Features/Transactions/ExpenseCategory.swift',
     'Opes/Features/Transactions/TransactionAmount.swift',
     'Opes/Features/Transactions/TransactionStore.swift',
     'Opes/Features/Transactions/TransactionCSVAttachment.swift',

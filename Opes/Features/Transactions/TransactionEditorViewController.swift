@@ -11,12 +11,15 @@ final class TransactionEditorViewController: UITableViewController {
     private let directionControl = UISegmentedControl(items: ["Money out", "Money in"])
     private let datePicker = UIDatePicker()
     private let accountButton = UIButton(type: .system)
+    private let categoryButton = UIButton(type: .system)
+    private var allocations: [TransactionAllocation] = []
     private lazy var rows: [UITableViewCell] = [
         FormRowCell(title: "Description", control: self.descriptionField, stretchesControl: true),
         FormRowCell(title: "Amount (AUD)", control: self.amountField, stretchesControl: true),
         FormHostCell(view: self.directionControl),
         FormHostCell(view: self.datePicker),
         FormRowCell(title: "Account", control: self.accountButton, stretchesControl: true),
+        FormRowCell(title: "Categories", control: self.categoryButton, stretchesControl: true),
     ]
 
     init(accountProvider: any AccountProviding, onSave: @escaping (Transaction) throws -> Void) {
@@ -57,6 +60,13 @@ final class TransactionEditorViewController: UITableViewController {
         self.amountField.accessibilityLabel = "Amount in Australian dollars"
         self.directionControl.selectedSegmentIndex = 0
         self.directionControl.accessibilityLabel = "Transaction direction"
+        self.directionControl.addTarget(self, action: #selector(self.validateForm), for: .valueChanged)
+        self.categoryButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        self.categoryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        self.categoryButton.titleLabel?.numberOfLines = 0
+        self.categoryButton.contentHorizontalAlignment = .trailing
+        self.categoryButton.accessibilityLabel = "Expense categories"
+        self.categoryButton.addTarget(self, action: #selector(self.editCategories), for: .touchUpInside)
         self.datePicker.datePickerMode = .dateAndTime
         self.datePicker.preferredDatePickerStyle = .compact
         self.datePicker.contentHorizontalAlignment = .trailing
@@ -137,6 +147,11 @@ final class TransactionEditorViewController: UITableViewController {
     }
 
     @objc private func validateForm() {
+        let isExpense = self.directionControl.selectedSegmentIndex == 0
+        self.categoryButton.isEnabled = isExpense && TransactionAmount.parse(self.amountField.text ?? "") != nil
+        self.categoryButton.setTitle(isExpense
+            ? (self.allocations.isEmpty ? "Uncategorised" : self.allocations.map { $0.category.rawValue }.joined(separator: ", "))
+            : "Expenses only", for: .normal)
         self.navigationItem.rightBarButtonItem?.isEnabled =
             !(self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && TransactionAmount.parse(self.amountField.text ?? "") != nil
@@ -150,11 +165,12 @@ final class TransactionEditorViewController: UITableViewController {
             return
         }
         do {
-            try self.onSave(Transaction(
+            let transaction = try Transaction(
                 id: UUID(), description: description, date: self.datePicker.date,
                 amount: self.directionControl.selectedSegmentIndex == 0 ? -amount : amount,
                 accountID: account.id
-            ))
+            ).withAllocations(self.directionControl.selectedSegmentIndex == 0 ? self.allocations : [])
+            try self.onSave(transaction)
             self.navigationController?.popViewController(animated: true)
         } catch {
             let alert = UIAlertController(
@@ -163,6 +179,23 @@ final class TransactionEditorViewController: UITableViewController {
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             self.present(alert, animated: true)
         }
+    }
+
+    @objc private func editCategories() {
+        guard let amount = TransactionAmount.parse(self.amountField.text ?? ""),
+              self.directionControl.selectedSegmentIndex == 0 else { return }
+        self.view.endEditing(true)
+        let draft = Transaction(id: UUID(), description: self.descriptionField.text ?? "",
+                                date: self.datePicker.date, amount: -amount, accountID: self.accountID ?? UUID())
+        // An amount edit may make the previous split too large; let the user
+        // correct it in the editor instead of dropping their allocations.
+        let editor = TransactionCategoriesViewController(
+            transaction: draft, allocations: self.allocations
+        ) { [weak self] allocations in
+            self?.allocations = allocations
+            self?.validateForm()
+        }
+        self.navigationController?.pushViewController(editor, animated: true)
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {

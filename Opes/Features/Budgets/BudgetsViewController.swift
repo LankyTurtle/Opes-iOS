@@ -11,7 +11,7 @@ final class BudgetsViewController: TabRootViewController {
         case budget(BudgetPreview)
     }
 
-    private let budgets = BudgetPreview.sample
+    private var budgets: [BudgetPreview] = []
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -75,10 +75,13 @@ final class BudgetsViewController: TabRootViewController {
     }
 
     private func applySnapshot() {
+        let previousItems = Set(self.dataSource.snapshot().itemIdentifiers)
+        self.budgets = BudgetPreview.current(transactions: TransactionStore.shared.transactions())
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.overview, .categories])
         snapshot.appendItems([.overview], toSection: .overview)
         snapshot.appendItems(self.budgets.map(Item.budget), toSection: .categories)
+        snapshot.reconfigureItems(snapshot.itemIdentifiers.filter { previousItems.contains($0) })
         self.dataSource.apply(snapshot, animatingDifferences: false)
     }
 
@@ -92,18 +95,9 @@ final class BudgetsViewController: TabRootViewController {
         self.periodRefreshTimer = timer
     }
 
-    /// Reconfiguring obtains a fresh `Date.now` for every visible tracker without
-    /// changing the list's identity or animating its rows.
+    /// Reload allocations as well as period markers, including at month rollover.
     private func refreshPeriodTrackers() {
-        var snapshot = self.dataSource.snapshot()
-        let items = snapshot.itemIdentifiers
-
-        guard !items.isEmpty else {
-            return
-        }
-
-        snapshot.reconfigureItems(items)
-        self.dataSource.apply(snapshot, animatingDifferences: false)
+        self.applySnapshot()
     }
 
     /// Every row draws in the chosen style, so the whole list is reconfigured — the

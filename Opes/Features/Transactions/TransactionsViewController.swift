@@ -9,6 +9,15 @@ final class TransactionsViewController: TabRootViewController {
     private let transactionProvider: any TransactionProviding
     private var transactions: [Transaction]
     private let transactionStore: TransactionStore
+    private var categoryFilter = TransactionCategoryFilter()
+    private lazy var filterItem: UIBarButtonItem = {
+        let menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] completion in
+            completion(self?.categoryFilterActions() ?? [])
+        }])
+        let item = UIBarButtonItem(image: UIImage(systemName: "line.3.horizontal.decrease"), menu: menu)
+        item.accessibilityLabel = "Filter transactions by category"
+        return item
+    }()
 
     private lazy var collectionView = UICollectionView(
         frame: .zero,
@@ -57,7 +66,7 @@ final class TransactionsViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.navigationItem.rightBarButtonItem = AppBarButtonItem.add(
+        let addItem = AppBarButtonItem.add(
             menu: UIMenu(children: [
                 UIAction(title: "Add Manually", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
                     self?.showManualEntry()
@@ -68,6 +77,7 @@ final class TransactionsViewController: TabRootViewController {
             ]),
             accessibilityLabel: "Add transaction"
         )
+        self.navigationItem.rightBarButtonItems = [addItem, self.filterItem]
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -343,6 +353,9 @@ final class TransactionsViewController: TabRootViewController {
     }
 
     private func apply(query: String, animated: Bool, completion: (() -> Void)? = nil) {
+        self.filterItem.isHidden = self.transactions.isEmpty
+        self.filterItem.style = self.categoryFilter.isActive ? .prominent : .plain
+        self.filterItem.accessibilityValue = self.categoryFilter.isActive ? "Filter active" : "All categories"
         self.searchControl.isHidden = self.transactions.isEmpty
         if self.transactions.isEmpty {
             self.searchBar.text = ""
@@ -352,12 +365,11 @@ final class TransactionsViewController: TabRootViewController {
         self.view.setNeedsLayout()
 
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matches = trimmed.isEmpty
-            ? self.transactions
-            : self.transactions.filter { transaction in
+        let matches = self.transactions.filter { transaction in
+            self.categoryFilter.matches(transaction) && (trimmed.isEmpty ||
                 [transaction.summary, transaction.description, transaction.reference ?? ""]
-                    .contains { $0.localizedCaseInsensitiveContains(trimmed) }
-            }
+                    .contains { $0.localizedCaseInsensitiveContains(trimmed) })
+        }
 
         var snapshot = NSDiffableDataSourceSnapshot<Section, Transaction>()
         snapshot.appendSections([.main])
@@ -372,11 +384,43 @@ final class TransactionsViewController: TabRootViewController {
         } else {
             empty.image = UIImage(systemName: "magnifyingglass")
             empty.text = "No matching transactions"
-            empty.secondaryText = "Try a different search."
+            empty.secondaryText = "Try a different search or category filter."
+            if self.categoryFilter.isActive {
+                empty.button.title = "Clear Category Filters"
+                empty.buttonProperties.primaryAction = UIAction { [weak self] _ in self?.clearCategoryFilter() }
+            }
         }
         self.contentUnavailableConfiguration = matches.isEmpty ? empty : nil
         // Keep search accessible above the system empty-state view.
         self.view.bringSubviewToFront(self.searchControl)
+    }
+
+    private func clearCategoryFilter() {
+        self.categoryFilter = TransactionCategoryFilter()
+        self.apply(query: self.searchBar.text ?? "", animated: true)
+    }
+
+    private func categoryFilterActions() -> [UIMenuElement] {
+        var actions: [UIMenuElement] = ExpenseCategory.allCases.map { category in
+            UIAction(title: category.rawValue, image: UIImage(systemName: category.symbolName),
+                     state: self.categoryFilter.categories.contains(category) ? .on : .off) { [weak self] _ in
+                guard let self else { return }
+                if !self.categoryFilter.categories.insert(category).inserted {
+                    self.categoryFilter.categories.remove(category)
+                }
+                self.apply(query: self.searchBar.text ?? "", animated: true)
+            }
+        }
+        actions.append(UIAction(title: "Uncategorised expenses",
+                                state: self.categoryFilter.includesUncategorised ? .on : .off) { [weak self] _ in
+            guard let self else { return }
+            self.categoryFilter.includesUncategorised.toggle()
+            self.apply(query: self.searchBar.text ?? "", animated: true)
+        })
+        actions.append(UIAction(title: "All categories", state: self.categoryFilter.isActive ? .off : .on) { [weak self] _ in
+            self?.clearCategoryFilter()
+        })
+        return actions
     }
 
     private func makeLayout() -> UICollectionViewLayout {
@@ -419,6 +463,12 @@ final class TransactionsViewController: TabRootViewController {
             var content = UIListContentConfiguration.subtitleCell()
             content.text = transaction.summary
             content.secondaryText = transaction.formattedDate
+            if transaction.amount < 0 {
+                var categories = transaction.allocations.map { $0.category.rawValue }
+                if transaction.unallocatedAmount > 0 { categories.append("Uncategorised") }
+                content.secondaryText = "\(transaction.formattedDate) · \(categories.joined(separator: ", "))"
+                content.secondaryTextProperties.numberOfLines = 0
+            }
             cell.contentConfiguration = content
             // The amount, then the chevron the row's details are behind.
             cell.accessories = [

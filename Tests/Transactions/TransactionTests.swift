@@ -101,6 +101,7 @@ enum TransactionTests {
     }
 
     static func main() throws {
+        try self.categoryChecks()
         try self.bsbInputChecks()
         try self.accountFilterChecks()
         try self.summaryChecks()

@@ -20,6 +20,7 @@ final class TransactionStore: TransactionProviding {
     }
 
     func save(_ newTransactions: [Transaction]) throws {
+        for transaction in newTransactions { try transaction.validateAllocations() }
         var transactions = try self.load()
         let identifiers = Set(newTransactions.map(\.id))
         transactions.removeAll { identifiers.contains($0.id) }

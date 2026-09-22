@@ -23,6 +23,7 @@ final class TransactionDetailsViewController: UITableViewController {
     private lazy var headlineRow = FormHostCell(view: self.headlineView)
 
     private let summaryField = UITextField()
+    private let categoriesRow = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
     private lazy var summaryRow = FormRowCell(
         title: "Summary", control: self.summaryField, stretchesControl: true
     )
@@ -106,6 +107,19 @@ final class TransactionDetailsViewController: UITableViewController {
         self.title = self.transaction.summary
         self.summaryField.text = self.transaction.summary
         self.headlineView.show(self.transaction)
+        var content = self.categoriesRow.defaultContentConfiguration()
+        content.text = "Categories"
+        let allocations = self.transaction.allocations.map {
+            "\($0.category.rawValue): \($0.amount.formatted(.currency(code: "AUD")))"
+        }
+        var lines = allocations
+        if self.transaction.unallocatedAmount > 0 {
+            lines.append("Uncategorised: \(self.transaction.unallocatedAmount.formatted(.currency(code: "AUD")))")
+        }
+        content.secondaryText = lines.joined(separator: "\n")
+        content.secondaryTextProperties.numberOfLines = 0
+        self.categoriesRow.contentConfiguration = content
+        self.categoriesRow.accessoryType = .disclosureIndicator
     }
 
     private func updateSummary(to summary: String) {
@@ -152,6 +166,9 @@ final class TransactionDetailsViewController: UITableViewController {
             DetailsSection(rows: [self.headlineRow]),
             DetailsSection(header: "Details", rows: details),
         ]
+        if self.transaction.amount < 0 {
+            sections.append(DetailsSection(header: "Budget allocation", rows: [self.categoriesRow]))
+        }
 
         // With one transaction on record the totals only restate the card above, so
         // the section waits until there is a history to summarise.
@@ -244,6 +261,20 @@ final class TransactionDetailsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+
+        if self.sections[indexPath.section].rows[indexPath.row] === self.categoriesRow {
+            self.view.endEditing(true)
+            let editor = TransactionCategoriesViewController(transaction: self.transaction) { [weak self] allocations in
+                guard let self else { return }
+                let updated = try self.transaction.withAllocations(allocations)
+                try self.transactionStore.save(updated)
+                self.transaction = updated
+                self.showTransaction()
+                self.tableView.reloadData()
+            }
+            self.navigationController?.pushViewController(editor, animated: true)
+            return
+        }
 
         if self.sections[indexPath.section].rows[indexPath.row] === self.deleteRow {
             self.deleteTransaction()

@@ -16,6 +16,33 @@ struct Transaction: Codable, Hashable, Identifiable {
     /// The user's own summary. Nil until they write one, so the summary follows
     /// the description.
     private(set) var customSummary: String?
+    // Optional storage keeps existing saved transactions decodable.
+    private var categoryAllocations: [TransactionAllocation]?
+
+    var allocations: [TransactionAllocation] { self.categoryAllocations ?? [] }
+    var unallocatedAmount: Decimal {
+        max(0, -self.amount - self.allocations.reduce(Decimal.zero) { $0 + $1.amount })
+    }
+
+    func withAllocations(_ allocations: [TransactionAllocation]) throws -> Transaction {
+        var copy = self
+        copy.categoryAllocations = allocations.isEmpty ? nil : allocations
+        try copy.validateAllocations()
+        return copy
+    }
+
+    func validateAllocations() throws {
+        guard !self.allocations.isEmpty else { return }
+        let total = self.allocations.reduce(Decimal.zero) { $0 + $1.amount }
+        guard self.amount < 0, total <= -self.amount,
+              Set(self.allocations.map(\.category)).count == self.allocations.count,
+              self.allocations.allSatisfy({ allocation in
+                  var amount = allocation.amount
+                  var rounded = Decimal()
+                  NSDecimalRound(&rounded, &amount, 2, .plain)
+                  return amount > 0 && amount == rounded
+              }) else { throw AllocationError.invalid }
+    }
 
     init(
         id: UUID, description: String, date: Date, hasTime: Bool = true, amount: Decimal,

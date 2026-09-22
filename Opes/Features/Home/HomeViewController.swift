@@ -256,7 +256,7 @@ final class HomeViewController: TabRootViewController {
             cycles: self.payCycleStore.load(),
             transactions: self.transactionProvider.transactions()
         )
-        self.budgetsTile.show(budgets: BudgetPreview.sample)
+        self.budgetsTile.show(budgets: BudgetPreview.current(transactions: self.transactionProvider.transactions()))
     }
 
     /// One section per tile, so each draws as its own grouped card.

@@ -5,13 +5,13 @@ final class TransactionEditorViewController: UITableViewController {
     private let onSave: (Transaction) throws -> Void
     private var accountID: AccountPreview.ID?
 
-    private let merchantField = UITextField()
+    private let descriptionField = UITextField()
     private let amountField = UITextField()
     private let directionControl = UISegmentedControl(items: ["Money out", "Money in"])
     private let datePicker = UIDatePicker()
     private let accountButton = UIButton(type: .system)
     private lazy var rows: [UITableViewCell] = [
-        FormRowCell(title: "Merchant", control: self.merchantField, stretchesControl: true),
+        FormRowCell(title: "Description", control: self.descriptionField, stretchesControl: true),
         FormRowCell(title: "Amount (AUD)", control: self.amountField, stretchesControl: true),
         FormHostCell(view: self.directionControl),
         FormHostCell(view: self.datePicker),
@@ -38,18 +38,18 @@ final class TransactionEditorViewController: UITableViewController {
         )
         self.tableView.keyboardDismissMode = .interactive
 
-        for field in [self.merchantField, self.amountField] {
+        for field in [self.descriptionField, self.amountField] {
             field.font = .preferredFont(forTextStyle: .body)
             field.adjustsFontForContentSizeCategory = true
             field.textAlignment = .right
             field.clearButtonMode = .whileEditing
             field.addTarget(self, action: #selector(self.validateForm), for: .editingChanged)
         }
-        self.merchantField.placeholder = "Name or description"
-        self.merchantField.accessibilityLabel = "Merchant or description"
-        self.merchantField.autocapitalizationType = .words
-        self.merchantField.returnKeyType = .done
-        self.merchantField.delegate = self
+        self.descriptionField.placeholder = "What it was for"
+        self.descriptionField.accessibilityLabel = "Description"
+        self.descriptionField.autocapitalizationType = .words
+        self.descriptionField.returnKeyType = .done
+        self.descriptionField.delegate = self
         self.amountField.placeholder = "0\(Locale.autoupdatingCurrent.decimalSeparator ?? ".")00"
         self.amountField.keyboardType = .decimalPad
         self.amountField.accessibilityLabel = "Amount in Australian dollars"
@@ -104,20 +104,20 @@ final class TransactionEditorViewController: UITableViewController {
 
     @objc private func validateForm() {
         self.navigationItem.rightBarButtonItem?.isEnabled =
-            !(self.merchantField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            !(self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && TransactionAmount.parse(self.amountField.text ?? "") != nil
             && self.accounts.contains { $0.id == self.accountID }
     }
 
     @objc private func save() {
-        let merchant = (self.merchantField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !merchant.isEmpty, let amount = TransactionAmount.parse(self.amountField.text ?? ""),
+        let description = (self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !description.isEmpty, let amount = TransactionAmount.parse(self.amountField.text ?? ""),
               let account = self.accounts.first(where: { $0.id == self.accountID }) else {
             return
         }
         do {
             try self.onSave(Transaction(
-                id: UUID(), merchant: merchant, date: self.datePicker.date,
+                id: UUID(), description: description, date: self.datePicker.date,
                 amount: self.directionControl.selectedSegmentIndex == 0 ? -amount : amount,
                 accountID: account.id
             ))

@@ -5,7 +5,9 @@ final class TransactionStore: TransactionProviding {
     static let shared = TransactionStore()
 
     private let defaults: UserDefaults
-    private let key = "manualTransactions.v1"
+    // v2 renamed the fields and made the account and time flag required; v1
+    // history no longer decodes, so it is left behind rather than read.
+    private let key = "transactions.v2"
     private let deletedAccountIDsKey = "transactionDeletedAccounts.v1"
 
     init(defaults: UserDefaults = .standard) {
@@ -15,9 +17,7 @@ final class TransactionStore: TransactionProviding {
     func transactions() -> [Transaction] {
         let deletedAccounts = (try? self.deletedAccountIDs()) ?? []
         return ((try? self.load()) ?? [])
-            .filter { transaction in
-                transaction.accountID.map { !deletedAccounts.contains($0) } ?? true
-            }
+            .filter { !deletedAccounts.contains($0.accountID) }
             .sorted { $0.date > $1.date }
     }
 
@@ -26,13 +26,10 @@ final class TransactionStore: TransactionProviding {
     }
 
     func save(_ newTransactions: [Transaction]) throws {
-        guard newTransactions.allSatisfy({ $0.accountID != nil }) else {
-            throw SaveError.accountRequired
-        }
         let deletedAccounts = try self.deletedAccountIDs()
-        guard newTransactions.allSatisfy({ transaction in
-            transaction.accountID.map { !deletedAccounts.contains($0) } ?? false
-        }) else { throw SaveError.accountDeleted }
+        guard newTransactions.allSatisfy({ !deletedAccounts.contains($0.accountID) }) else {
+            throw SaveError.accountDeleted
+        }
         var transactions = try self.load()
         let identifiers = Set(newTransactions.map(\.id))
         transactions.removeAll { identifiers.contains($0.id) }
@@ -70,11 +67,9 @@ final class TransactionStore: TransactionProviding {
     }
 
     enum SaveError: LocalizedError {
-        case accountRequired
         case accountDeleted
         var errorDescription: String? {
             switch self {
-            case .accountRequired: "Select an account for every transaction before saving."
             case .accountDeleted: "This account has been deleted. Select another account before saving."
             }
         }

@@ -90,7 +90,7 @@ struct SpendingPattern: Hashable {
     /// once from the schedule the user entered and again from the deposit it left
     /// behind.
     ///
-    /// Matched on the linked transaction's merchant where the user set one, and on
+    /// Matched on the linked transaction's description where the user set one, and on
     /// the cycle's own name otherwise — which is what someone naming a cycle
     /// "Salary" would expect.
     func withoutIncome(coveredBy payCycles: [PayCycle], in transactions: [Transaction]) -> SpendingPattern {
@@ -99,7 +99,7 @@ struct SpendingPattern: Hashable {
                 .filter(\.isEnabled)
                 .flatMap { cycle -> [String] in
                     let linked = transactions.first { $0.id == cycle.linkedTransactionID }
-                    return [linked?.merchant, cycle.name]
+                    return [linked?.description, cycle.name]
                         .compactMap { $0?.lowercased() }
                 }
         )
@@ -141,7 +141,7 @@ struct SpendingPattern: Hashable {
         let recurringMerchants = Set(recurring.map(\.merchant))
 
         let irregularOutflows = observed.filter {
-            $0.amount < 0 && !recurringMerchants.contains($0.merchant)
+            $0.amount < 0 && !recurringMerchants.contains($0.description)
         }
         let totalOutflow = observed.reduce(Decimal.zero) { $0 - min($1.amount, 0) }
         let irregularTotal = irregularOutflows.reduce(Decimal.zero) { $0 - $1.amount }
@@ -214,7 +214,7 @@ struct RecurrenceDetector {
     }
 
     func detect(in transactions: [Transaction]) -> [RecurringTransaction] {
-        Dictionary(grouping: transactions, by: \.merchant)
+        Dictionary(grouping: transactions, by: \.description)
             .compactMap { merchant, group in
                 self.recurrence(for: merchant, in: group)
             }

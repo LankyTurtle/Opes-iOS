@@ -2,58 +2,49 @@ import Foundation
 
 struct Transaction: Codable, Hashable, Identifiable {
     let id: UUID
-    /// The description as the bank or the user first recorded it. Stored under
-    /// its original key so history saved before display names still decodes.
-    let merchant: String
+    /// The description as the bank or the user first recorded it. Never edited.
+    let description: String
     let date: Date
+    /// Whether `date` carries a time of day; CSV exports only give the day.
+    let hasTime: Bool
     /// Negative for money out, positive for money in.
     let amount: Decimal
-    /// Required for newly saved transactions. Optional for decoding older local
-    /// history that was saved before account selection was mandatory.
-    let accountID: AccountPreview.ID?
+    let accountID: AccountPreview.ID
     let sourceInstitution: String?
     /// The bank's reference for the transaction, when the import carried one.
     let reference: String?
-    /// The user's own name for the transaction. Nil shows the description.
-    private(set) var displayDescription: String?
-    /// Whether `date` carries a time of day; CSV exports only give the day. Nil
-    /// for history saved before this was recorded.
-    private let timeRecorded: Bool?
+    /// The user's own summary. Nil until they write one, so the summary follows
+    /// the description.
+    private(set) var customSummary: String?
 
     init(
-        id: UUID, merchant: String, date: Date, amount: Decimal,
-        accountID: AccountPreview.ID?, sourceInstitution: String? = nil,
-        reference: String? = nil, displayDescription: String? = nil, hasTime: Bool = true
+        id: UUID, description: String, date: Date, hasTime: Bool = true, amount: Decimal,
+        accountID: AccountPreview.ID, sourceInstitution: String? = nil,
+        reference: String? = nil, customSummary: String? = nil
     ) {
         self.id = id
-        self.merchant = merchant
+        self.description = description
         self.date = date
+        self.hasTime = hasTime
         self.amount = amount
         self.accountID = accountID
         self.sourceInstitution = sourceInstitution
         self.reference = reference
-        self.displayDescription = displayDescription
-        self.timeRecorded = hasTime
+        self.customSummary = customSummary
     }
 
-    /// Older history didn't record this. Imports landed on local midnight and
-    /// manual entries almost never do, so midnight reads as no time.
-    var hasTime: Bool {
-        self.timeRecorded ?? (Calendar.current.startOfDay(for: self.date) != self.date)
+    /// What the transaction is shown as everywhere: the user's summary, or the
+    /// description until they write one.
+    var summary: String {
+        self.customSummary ?? self.description
     }
 
-    /// What the transaction is shown as everywhere: the user's name for it, or
-    /// the description until they give it one.
-    var displayName: String {
-        self.displayDescription ?? self.merchant
-    }
-
-    /// A copy shown as `name`. A blank name, or one that only repeats the
-    /// description, goes back to showing the description.
-    func renamed(to name: String) -> Transaction {
+    /// A copy summarised as `text`. A blank summary, or one that only repeats
+    /// the description, goes back to following the description.
+    func withSummary(_ text: String) -> Transaction {
         var copy = self
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        copy.displayDescription = trimmed.isEmpty || trimmed == self.merchant ? nil : trimmed
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        copy.customSummary = trimmed.isEmpty || trimmed == self.description ? nil : trimmed
         return copy
     }
 

@@ -173,7 +173,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
                 cell.accessibilityTraits = enabled ? .button : [.button, .notEnabled]
             } else {
                 let transaction = self.parsedTransactions[indexPath.row - 1]
-                content.text = transaction.merchant
+                content.text = transaction.description
                 content.secondaryText = "\(transaction.date.formatted(date: .abbreviated, time: .omitted)) · \(transaction.formattedAmount)"
                 cell.selectionStyle = .none
             }

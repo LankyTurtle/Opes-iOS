@@ -88,7 +88,7 @@ final class RecentTransactionsTileView: UIView {
     }
 }
 
-/// One transaction in the card: the merchant and when it moved, the amount, and
+/// One transaction in the card: its summary and when it moved, the amount, and
 /// the chevron its details are behind.
 private final class TransactionRowControl: UIControl {
     let transaction: Transaction
@@ -97,10 +97,10 @@ private final class TransactionRowControl: UIControl {
         self.transaction = transaction
         super.init(frame: .zero)
 
-        let merchantLabel = UILabel()
-        merchantLabel.font = .preferredFont(forTextStyle: .body)
-        merchantLabel.adjustsFontForContentSizeCategory = true
-        merchantLabel.text = transaction.displayName
+        let summaryLabel = UILabel()
+        summaryLabel.font = .preferredFont(forTextStyle: .body)
+        summaryLabel.adjustsFontForContentSizeCategory = true
+        summaryLabel.text = transaction.summary
 
         let dateLabel = UILabel()
         dateLabel.font = .preferredFont(forTextStyle: .footnote)
@@ -108,7 +108,7 @@ private final class TransactionRowControl: UIControl {
         dateLabel.textColor = .secondaryLabel
         dateLabel.text = transaction.formattedDate
 
-        let detailStack = UIStackView(arrangedSubviews: [merchantLabel, dateLabel])
+        let detailStack = UIStackView(arrangedSubviews: [summaryLabel, dateLabel])
         detailStack.axis = .vertical
         detailStack.alignment = .leading
         detailStack.spacing = 2
@@ -118,7 +118,7 @@ private final class TransactionRowControl: UIControl {
         amountLabel.adjustsFontForContentSizeCategory = true
         amountLabel.textAlignment = .right
         amountLabel.text = transaction.formattedAmount
-        // The amount never truncates; the merchant name gives way instead.
+        // The amount never truncates; the summary gives way instead.
         amountLabel.setContentHuggingPriority(.required, for: .horizontal)
         amountLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
 
@@ -146,7 +146,7 @@ private final class TransactionRowControl: UIControl {
         self.isAccessibilityElement = true
         self.accessibilityTraits = .button
         self.accessibilityLabel =
-            "\(transaction.displayName), \(transaction.formattedAmount), \(transaction.formattedDate)"
+            "\(transaction.summary), \(transaction.formattedAmount), \(transaction.formattedDate)"
         self.accessibilityHint = "Open the transaction's details"
 
         NSLayoutConstraint.activate([

@@ -32,7 +32,7 @@ Filters** in the menu, or in the empty list, to show every account again.
 Filters reset when the app relaunches.
 
 On Transactions, tap **+** to choose **Add Manually** or **Upload CSV**.
-Manual entry supports an AUD amount, money in/out, date, merchant/description,
+Manual entry supports an AUD amount, money in/out, date and time, description,
 and a required account. Saved transactions also appear in Home and the
 transaction providers used by forecasts and pay cycles.
 
@@ -45,8 +45,7 @@ the visible history.
 
 The top of transaction details shows **Debit** or **Credit**, the amount without
 a sign, and when it happened (`Tue 22 Sep 2026, 3:45 pm`). CSV imports carry
-no time, so they show only the date, here and in lists; older imports saved at
-midnight are treated the same way.
+no time, so they show only the date, here and in lists.
 
 Below that, details show a **Summary**, the original
 **Description**, and the **Reference** ("None" when the transaction has none).
@@ -82,8 +81,9 @@ embedded newlines, CRLF, and a UTF-8 BOM are supported. The institution is saved
 with each imported transaction alongside the selected account's stable identifier. This is a common
 header-based format, not a set of bank-specific export adapters. Invalid files
 are rejected as a whole. Re-importing a file creates new transactions.
-New transactions cannot be saved without an account. Previously saved unlinked
-history remains readable; this change does not guess accounts for legacy records.
+Every transaction belongs to an account. Transactions are stored as
+`transactions.v2`; history saved in the earlier `manualTransactions.v1` format
+is not migrated, so re-import it or enter it again.
 
 ## Transaction checks
 

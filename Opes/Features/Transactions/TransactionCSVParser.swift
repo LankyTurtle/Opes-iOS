@@ -36,7 +36,7 @@ enum TransactionCSVParser {
             return matches.first
         }
         guard let dateColumn = try column(["date", "transaction date"]),
-              let merchantColumn = try column(["description", "merchant", "transaction description", "details"]) else {
+              let descriptionColumn = try column(["description", "merchant", "transaction description", "details"]) else {
             throw ImportError(message: "The CSV needs Date and Description (or Merchant) columns.")
         }
         let referenceColumn = try column(["reference", "ref", "transaction reference", "receipt number"])
@@ -72,8 +72,8 @@ enum TransactionCSVParser {
             }).first else {
                 throw invalid("Use a date such as 20/09/2026 or 2026-09-20.")
             }
-            let merchant = row[merchantColumn].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !merchant.isEmpty else { throw invalid("A description is required.") }
+            let description = row[descriptionColumn].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !description.isEmpty else { throw invalid("A description is required.") }
             let amount: Decimal
             if let amountColumn {
                 guard let value = self.amount(row[amountColumn]) else {
@@ -97,9 +97,9 @@ enum TransactionCSVParser {
                 .map { row[$0].trimmingCharacters(in: .whitespacesAndNewlines) }
                 .flatMap { $0.isEmpty ? nil : $0 }
             return Transaction(
-                id: UUID(), merchant: merchant, date: date, amount: amount,
+                id: UUID(), description: description, date: date, hasTime: false, amount: amount,
                 accountID: accountID, sourceInstitution: institution,
-                reference: reference, hasTime: false
+                reference: reference
             )
         }
     }

@@ -91,7 +91,7 @@ final class PayCyclesViewController: UITableViewController {
             let schedule = cycle.isEnabled
                 ? "\(amount) · \(display.countdown) · \(date)"
                 : "Disabled · \(amount) · \(date)"
-            content.secondaryText = linkedTransaction.map { "\(schedule)\nLinked: \($0.displayName) · \($0.formattedAmount)" } ?? schedule
+            content.secondaryText = linkedTransaction.map { "\(schedule)\nLinked: \($0.summary) · \($0.formattedAmount)" } ?? schedule
         } else {
             content.secondaryText = "No upcoming pay date"
         }

@@ -66,18 +66,18 @@ enum TransactionTests {
         try self.expect(edit("062-000", 3, 0, "9") == ("062-900", 5), "Caret moves past the hyphen after the fourth digit")
     }
 
-    static func displayDescriptionChecks() throws {
-        let original = Transaction(id: UUID(), merchant: "WOOLWORTHS 1234 SYDNEY", date: .now, amount: -5, accountID: UUID(), reference: "R1")
-        try self.expect(original.displayName == "WOOLWORTHS 1234 SYDNEY", "Summary defaults to the description")
-        let renamed = original.renamed(to: "  Groceries ")
-        try self.expect(renamed.displayName == "Groceries" && renamed.merchant == original.merchant, "Renaming keeps the description")
-        try self.expect(renamed.renamed(to: " ").displayDescription == nil, "A blank name goes back to the description")
-        try self.expect(renamed.renamed(to: original.merchant).displayDescription == nil, "Repeating the description stores no name")
-        let encoded = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(renamed))
-        try self.expect(encoded == renamed, "Summary and reference persist")
-        let legacyID = UUID()
-        let legacy = try JSONDecoder().decode(Transaction.self, from: Data(#"{"id":"\#(legacyID)","merchant":"Shop","date":0,"amount":-1}"#.utf8))
-        try self.expect(legacy.displayName == "Shop" && legacy.reference == nil, "Transactions saved before display names still load")
+    static func summaryChecks() throws {
+        let original = Transaction(id: UUID(), description: "WOOLWORTHS 1234 SYDNEY", date: .now, amount: -5, accountID: UUID(), reference: "R1")
+        try self.expect(original.summary == "WOOLWORTHS 1234 SYDNEY", "Summary defaults to the description")
+        let summarised = original.withSummary("  Groceries ")
+        try self.expect(summarised.summary == "Groceries" && summarised.description == original.description, "Summarising keeps the description")
+        try self.expect(summarised.withSummary(" ").customSummary == nil, "A blank summary goes back to the description")
+        try self.expect(summarised.withSummary(original.description).customSummary == nil, "Repeating the description stores no summary")
+        let decoded = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(summarised))
+        try self.expect(decoded == summarised, "Summary, reference, and time flag persist")
+        try self.rejects("Reject v1 history without the renamed fields") {
+            _ = try JSONDecoder().decode(Transaction.self, from: Data(#"{"id":"\#(UUID())","merchant":"Shop","date":0,"amount":-1}"#.utf8))
+        }
 
         let referenced = try self.parse("Date,Description,Reference,Amount\n20/09/2026,Shop, REF123 ,-1\n20/09/2026,Pay,,100")
         try self.expect(referenced.map(\.reference) == ["REF123", nil], "CSV reference is trimmed and optional per row")
@@ -94,18 +94,16 @@ enum TransactionTests {
         try self.expect(imported.directionDescription == "Debit", "Money out is a debit")
         var components = DateComponents(year: 2026, month: 9, day: 5, hour: 15, minute: 45)
         components.timeZone = sydney
-        let manual = Transaction(id: UUID(), merchant: "Pay", date: Calendar(identifier: .gregorian).date(from: components)!, amount: 10, accountID: UUID())
+        let manual = Transaction(id: UUID(), description: "Pay", date: Calendar(identifier: .gregorian).date(from: components)!, amount: 10, accountID: UUID())
         let occurrence = manual.formattedOccurrence(locale: au, timeZone: sydney)
         try self.expect(manual.hasTime && occurrence.hasPrefix("Sat 05 Sep 2026, 3:45"), "Manual transactions show the day and time: \(occurrence)")
         try self.expect(manual.directionDescription == "Credit", "Money in is a credit")
-        let legacy = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(imported).replacingTimeRecorded())
-        try self.expect(!legacy.hasTime, "Older imports at midnight read as having no time")
     }
 
     static func main() throws {
         try self.bsbInputChecks()
         try self.accountFilterChecks()
-        try self.displayDescriptionChecks()
+        try self.summaryChecks()
         try self.occurrenceChecks()
         try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")
@@ -121,7 +119,7 @@ enum TransactionTests {
         try self.expect(signed[1].isMoneyIn, "Positive amount direction")
         try self.expect(signed.allSatisfy { $0.sourceInstitution == "Test Bank" && $0.accountID == self.accountID }, "Every imported row belongs to the selected account")
         let quoted = try self.parse("Date,Description,Amount\n20/09/2026,\"Cafe, \"\"Main\"\"\nStreet\",\"-1,234.56\"")
-        try self.expect(quoted[0].merchant == "Cafe, \"Main\"\nStreet", "Quoted comma, escaped quotes, embedded newline")
+        try self.expect(quoted[0].description == "Cafe, \"Main\"\nStreet", "Quoted comma, escaped quotes, embedded newline")
         try self.expect(quoted[0].amount == Decimal(string: "-1234.56"), "Grouped amounts")
         let separate = try self.parse("Transaction Date,Details,Debit,Credit\n20/09/2026,Shop,12.34,\n20/09/2026,Pay,,100\n")
         try self.expect(separate.map(\.amount) == [Decimal(string: "-12.34")!, 100], "Debit and credit direction")
@@ -219,10 +217,6 @@ enum TransactionTests {
         let secondAccountRows = try TransactionCSVParser.parse(bytes, accountID: second.id, institution: second.institution)
         try self.expect(firstAccountRows.allSatisfy { $0.accountID == created.id }, "Import links to newly created account")
         try self.expect(secondAccountRows.allSatisfy { $0.accountID == second.id }, "Reparsing for a different account changes every link")
-        let unlinked = Transaction(id: UUID(), merchant: "Unlinked", date: .now, amount: -1, accountID: nil)
-        try self.rejects("Reject unlinked manual transaction") { try store.save(unlinked) }
-        try self.rejects("Reject whole import with an unlinked row") { try store.save(firstAccountRows + [unlinked]) }
-        try self.expect(store.transactions().isEmpty, "Rejected import does not partially save")
         try store.save(signed)
         let reloaded = TransactionStore(defaults: defaults)
         try self.expect(reloaded.transactions() == signed.sorted { $0.date > $1.date }, "Transactions persist with institution and decimal amounts")
@@ -233,7 +227,7 @@ enum TransactionTests {
         let beforeDeletion = store.transactions()
         try store.delete(id: signed[0].id)
         try self.expect(reloaded.transactions() == beforeDeletion.filter { $0.id != signed[0].id }, "Delete exact transaction and preserve others across reload")
-        let storedAfterDeletion = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "manualTransactions.v1")!)
+        let storedAfterDeletion = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "transactions.v2")!)
         try self.expect(!storedAfterDeletion.contains { $0.id == signed[0].id }, "Manual and imported transactions are removed from storage")
         try store.delete(id: signed[0].id)
         try store.delete(id: UUID())
@@ -243,17 +237,17 @@ enum TransactionTests {
         try store.delete(id: duplicateRows[1].id)
         try self.expect(!reloaded.transactions().contains { $0.id == duplicateRows[1].id }, "Deleted transaction stays deleted after recreation of store")
         try self.expect(reloaded.transactions().contains { $0.id == duplicateRows[0].id }, "Identical-looking transaction with different ID remains")
-        try self.expect(reloaded.transactions().filter { $0.merchant == "Same merchant" }.count == 1, "Search results exclude deleted transaction")
+        try self.expect(reloaded.transactions().filter { $0.description == "Same merchant" }.count == 1, "Search results exclude deleted transaction")
         try store.delete(id: duplicateRows[0].id)
         for transaction in store.transactions() { try store.delete(id: transaction.id) }
         try self.expect(reloaded.transactions().isEmpty, "Deleting all transactions produces empty history")
         defaults.set(Data("broken".utf8), forKey: "accounts.v1")
         try self.rejects("Do not overwrite corrupt account storage") { _ = try accounts.create(name: "Account", type: .transaction, number: "12345678", bsb: "062000", institution: "Bank") }
         try self.expect(defaults.data(forKey: "accounts.v1") == Data("broken".utf8), "Corrupt account data retained for recovery")
-        defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
+        defaults.set(Data("broken".utf8), forKey: "transactions.v2")
         try self.rejects("Do not overwrite corrupted history") { try store.save(signed[0]) }
         try self.rejects("Do not delete with corrupted transaction history") { try store.delete(id: signed[0].id) }
-        try self.expect(defaults.data(forKey: "manualTransactions.v1") == Data("broken".utf8), "Corrupt history remains available for recovery")
+        try self.expect(defaults.data(forKey: "transactions.v2") == Data("broken".utf8), "Corrupt history remains available for recovery")
         print("Passed \(self.checks) transaction checks.")
     }
 
@@ -265,7 +259,7 @@ enum TransactionTests {
         let target = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: "062000", institution: "Bank")
         let other = try accounts.create(name: "Everyday", type: .transaction, number: "12345678", bsb: "062000", institution: "Bank")
         func transaction(_ accountID: UUID) -> Transaction {
-            Transaction(id: UUID(), merchant: "Shop", date: .now, amount: -10, accountID: accountID)
+            Transaction(id: UUID(), description: "Shop", date: .now, amount: -10, accountID: accountID)
         }
         let transactions = TransactionStore(defaults: defaults)
         let savedTarget = transaction(target.id)
@@ -277,7 +271,7 @@ enum TransactionTests {
         try self.expect(try reopenedAccounts.load() == [other], "Account deletion persists and preserves same-name accounts")
         try self.expect(try reopenedAccounts.deletedAccountIDs().contains(target.id), "Deleted account ID is retained")
         try self.expect(reopenedTransactions.transactions() == [savedOther], "Cascade removes transactions for only the deleted account")
-        let savedRows = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "manualTransactions.v1")!)
+        let savedRows = try JSONDecoder().decode([Transaction].self, from: defaults.data(forKey: "transactions.v2")!)
         try self.expect(savedRows == [savedOther], "Cascade physically removes saved linked history")
         try accounts.delete(id: target.id, transactionStore: transactions)
         try self.expect(reopenedTransactions.transactions().count == 1, "Repeated account deletion is harmless")
@@ -289,34 +283,25 @@ enum TransactionTests {
 
         // Decode failures must not leave the account and its history half-deleted.
         let goodAccounts = defaults.data(forKey: "accounts.v1")!
-        let goodTransactions = defaults.data(forKey: "manualTransactions.v1")!
+        let goodTransactions = defaults.data(forKey: "transactions.v2")!
         let goodDeletedAccounts = defaults.data(forKey: "deletedAccounts.v1")!
         let goodDeletedTransactionAccounts = defaults.data(forKey: "transactionDeletedAccounts.v1")!
         defaults.set(Data("broken".utf8), forKey: "accounts.v1")
         try self.rejects("Reject cascade with corrupt accounts") { try accounts.delete(id: other.id, transactionStore: transactions) }
-        try self.expect(defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Account read failure preserves linked history")
+        try self.expect(defaults.data(forKey: "transactions.v2") == goodTransactions, "Account read failure preserves linked history")
         defaults.set(goodAccounts, forKey: "accounts.v1")
         defaults.set(Data("broken".utf8), forKey: "deletedAccounts.v1")
         try self.rejects("Reject cascade with corrupt account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
-        try self.expect(defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Account deletion record failure preserves history")
+        try self.expect(defaults.data(forKey: "transactions.v2") == goodTransactions, "Account deletion record failure preserves history")
         defaults.set(goodDeletedAccounts, forKey: "deletedAccounts.v1")
-        defaults.set(Data("broken".utf8), forKey: "manualTransactions.v1")
+        defaults.set(Data("broken".utf8), forKey: "transactions.v2")
         try self.rejects("Reject cascade with corrupt transactions") { try accounts.delete(id: other.id, transactionStore: transactions) }
         try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts, "Transaction read failure preserves account")
         try self.expect(defaults.data(forKey: "deletedAccounts.v1") == goodDeletedAccounts, "Failed cascade does not hide account")
-        defaults.set(goodTransactions, forKey: "manualTransactions.v1")
+        defaults.set(goodTransactions, forKey: "transactions.v2")
         defaults.set(Data("broken".utf8), forKey: "transactionDeletedAccounts.v1")
         try self.rejects("Reject cascade with corrupt transaction account deletion records") { try accounts.delete(id: other.id, transactionStore: transactions) }
-        try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts && defaults.data(forKey: "manualTransactions.v1") == goodTransactions, "Failed cascade preserves both stores")
+        try self.expect(defaults.data(forKey: "accounts.v1") == goodAccounts && defaults.data(forKey: "transactions.v2") == goodTransactions, "Failed cascade preserves both stores")
         defaults.set(goodDeletedTransactionAccounts, forKey: "transactionDeletedAccounts.v1")
-    }
-}
-
-private extension Data {
-    /// Strips the time flag, as history saved before it existed would lack it.
-    func replacingTimeRecorded() throws -> Data {
-        var object = try JSONSerialization.jsonObject(with: self) as! [String: Any]
-        object["timeRecorded"] = nil
-        return try JSONSerialization.data(withJSONObject: object)
     }
 }

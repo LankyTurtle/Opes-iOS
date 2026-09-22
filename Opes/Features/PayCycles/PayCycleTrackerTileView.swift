@@ -90,7 +90,7 @@ final class PayCycleTrackerTileView: UIControl {
         let summary = upcoming.map { cycle, display in
             let amount = cycle.amount.formatted(.currency(code: "AUD"))
             let linked = transactions.first { $0.id == cycle.linkedTransactionID }
-            let linkedDescription = linked.map { ", linked transaction \($0.displayName), \($0.formattedAmount)" } ?? ""
+            let linkedDescription = linked.map { ", linked transaction \($0.summary), \($0.formattedAmount)" } ?? ""
             return "\(cycle.name), \(amount), \(display.countdown), \(display.date.formatted(date: .abbreviated, time: .omitted))\(linkedDescription)"
         }
             .joined(separator: ". ")
@@ -138,7 +138,7 @@ final class PayCycleTrackerTileView: UIControl {
             linked.font = .preferredFont(forTextStyle: .footnote)
             linked.adjustsFontForContentSizeCategory = true
             linked.textColor = .tertiaryLabel
-            linked.text = "Linked: \(linkedTransaction.displayName) · \(linkedTransaction.formattedAmount)"
+            linked.text = "Linked: \(linkedTransaction.summary) · \(linkedTransaction.formattedAmount)"
             row.addArrangedSubview(linked)
         }
         row.isAccessibilityElement = false

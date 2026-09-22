@@ -317,14 +317,14 @@ final class PayCycleEditorViewController: UITableViewController {
                 self?.refreshForm()
             },
         ] + self.linkableTransactions.map { transaction in
-            let title = "\(transaction.displayName) · \(transaction.formattedAmount) · \(transaction.formattedDate)"
+            let title = "\(transaction.summary) · \(transaction.formattedAmount) · \(transaction.formattedDate)"
             return UIAction(title: title, state: transaction.id == self.linkedTransactionID ? .on : .off) { [weak self] _ in
                 self?.linkedTransactionID = transaction.id
                 self?.refreshForm()
             }
         })
         self.transactionButton.setTitle(
-            selected.map { "\($0.displayName) · \($0.formattedAmount)" } ?? "No linked transaction",
+            selected.map { "\($0.summary) · \($0.formattedAmount)" } ?? "No linked transaction",
             for: .normal
         )
     }

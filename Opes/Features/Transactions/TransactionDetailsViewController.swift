@@ -14,18 +14,17 @@ final class TransactionDetailsViewController: UITableViewController {
     private let onDelete: (() -> Void)?
     private var isDeleting = false
 
-    /// The account the money moved through, when the transaction names one that is
-    /// still on file.
+    /// The account the money moved through, while it is still on file.
     private let account: AccountPreview?
     private let merchantHistory: MerchantHistory
 
-    private let summaryView = TransactionSummaryView()
+    private let headlineView = TransactionHeadlineView()
 
-    private lazy var summaryRow = FormHostCell(view: self.summaryView)
+    private lazy var headlineRow = FormHostCell(view: self.headlineView)
 
-    private let displayDescriptionField = UITextField()
-    private lazy var displayDescriptionRow = FormRowCell(
-        title: "Summary", control: self.displayDescriptionField, stretchesControl: true
+    private let summaryField = UITextField()
+    private lazy var summaryRow = FormRowCell(
+        title: "Summary", control: self.summaryField, stretchesControl: true
     )
 
     private lazy var deleteRow: UITableViewCell = {
@@ -69,7 +68,7 @@ final class TransactionDetailsViewController: UITableViewController {
         self.onDelete = onDelete
         self.account = accountProvider.accounts().first { $0.id == transaction.accountID }
         self.merchantHistory = MerchantHistory.make(
-            for: transaction.merchant,
+            for: transaction.description,
             in: transactionProvider.transactions()
         )
         super.init(style: .insetGrouped)
@@ -88,7 +87,7 @@ final class TransactionDetailsViewController: UITableViewController {
         self.navigationItem.largeTitleDisplayMode = .never
         self.tableView.keyboardDismissMode = .interactive
 
-        let field = self.displayDescriptionField
+        let field = self.summaryField
         field.font = .preferredFont(forTextStyle: .body)
         field.adjustsFontForContentSizeCategory = true
         field.textAlignment = .right
@@ -97,30 +96,30 @@ final class TransactionDetailsViewController: UITableViewController {
         field.returnKeyType = .done
         field.accessibilityLabel = "Summary"
         // Clearing the field goes back to the description, so it is the hint.
-        field.placeholder = self.transaction.merchant
+        field.placeholder = self.transaction.description
         field.delegate = self
 
         self.showTransaction()
     }
 
     private func showTransaction() {
-        self.title = self.transaction.displayName
-        self.displayDescriptionField.text = self.transaction.displayName
-        self.summaryView.show(self.transaction)
+        self.title = self.transaction.summary
+        self.summaryField.text = self.transaction.summary
+        self.headlineView.show(self.transaction)
     }
 
-    private func rename(to name: String) {
+    private func updateSummary(to summary: String) {
         // Leaving the screen ends editing; after a delete that must not save
         // the transaction back.
         guard !self.isDeleting else { return }
-        let renamed = self.transaction.renamed(to: name)
-        if renamed != self.transaction {
+        let updated = self.transaction.withSummary(summary)
+        if updated != self.transaction {
             do {
-                try self.transactionStore.save(renamed)
-                self.transaction = renamed
+                try self.transactionStore.save(updated)
+                self.transaction = updated
             } catch {
                 let alert = UIAlertController(
-                    title: "Couldn’t rename transaction", message: error.localizedDescription, preferredStyle: .alert
+                    title: "Couldn’t save summary", message: error.localizedDescription, preferredStyle: .alert
                 )
                 alert.addAction(UIAlertAction(title: "OK", style: .default))
                 self.present(alert, animated: true)
@@ -132,8 +131,8 @@ final class TransactionDetailsViewController: UITableViewController {
 
     private func makeSections() -> [DetailsSection] {
         var details: [UITableViewCell] = [
-            self.displayDescriptionRow,
-            Self.makeDetailRow(title: "Description", value: self.transaction.merchant),
+            self.summaryRow,
+            Self.makeDetailRow(title: "Description", value: self.transaction.description),
             Self.makeDetailRow(title: "Reference", value: self.transaction.reference ?? "None"),
         ]
 
@@ -141,14 +140,16 @@ final class TransactionDetailsViewController: UITableViewController {
             details.append(accountRow)
             details.append(Self.makeDetailRow(title: "Institution", value: account.institution))
         } else {
-            details.append(Self.makeDetailRow(title: "Account", value: "Not linked"))
+            // Every transaction names an account; it can only be missing if the
+            // account went while this screen was being opened.
+            details.append(Self.makeDetailRow(title: "Account", value: "Unavailable"))
             if let institution = self.transaction.sourceInstitution {
                 details.append(Self.makeDetailRow(title: "Institution", value: institution))
             }
         }
 
         var sections: [DetailsSection] = [
-            DetailsSection(rows: [self.summaryRow]),
+            DetailsSection(rows: [self.headlineRow]),
             DetailsSection(header: "Details", rows: details),
         ]
 
@@ -172,7 +173,7 @@ final class TransactionDetailsViewController: UITableViewController {
                             value: ForecastFormatter.signedCurrency(self.merchantHistory.average)
                         ),
                     ],
-                    footer: self.merchantHistory.description(of: self.transaction.merchant)
+                    footer: self.merchantHistory.description(of: self.transaction.description)
                 )
             )
         }
@@ -274,12 +275,12 @@ extension TransactionDetailsViewController: UITextFieldDelegate {
     }
 
     func textFieldDidEndEditing(_ textField: UITextField) {
-        self.rename(to: textField.text ?? "")
+        self.updateSummary(to: textField.text ?? "")
     }
 }
 
-/// Everything on record from one merchant, so a single transaction can be read
-/// against the rest of them.
+/// Everything on record from one merchant (transactions sharing a description),
+/// so a single transaction can be read against the rest of them.
 private struct MerchantHistory {
     let count: Int
     let total: Decimal
@@ -287,8 +288,8 @@ private struct MerchantHistory {
     /// The oldest transaction on record, which is how far back the totals reach.
     let earliest: Date?
 
-    static func make(for merchant: String, in transactions: [Transaction]) -> MerchantHistory {
-        let matches = transactions.filter { $0.merchant == merchant }
+    static func make(for description: String, in transactions: [Transaction]) -> MerchantHistory {
+        let matches = transactions.filter { $0.description == description }
         let total = matches.reduce(Decimal.zero) { $0 + $1.amount }
 
         return MerchantHistory(
@@ -312,7 +313,7 @@ private struct MerchantHistory {
 
 /// The headline of the details screen: whether it was a debit or a credit, how
 /// much moved, and when.
-private final class TransactionSummaryView: UIView {
+private final class TransactionHeadlineView: UIView {
     private let directionLabel = UILabel()
     private let amountLabel = UILabel()
     private let dateLabel = UILabel()

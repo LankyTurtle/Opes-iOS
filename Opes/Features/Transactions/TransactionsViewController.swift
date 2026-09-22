@@ -355,7 +355,7 @@ final class TransactionsViewController: TabRootViewController {
         let matches = trimmed.isEmpty
             ? self.transactions
             : self.transactions.filter { transaction in
-                [transaction.displayName, transaction.merchant, transaction.reference ?? ""]
+                [transaction.summary, transaction.description, transaction.reference ?? ""]
                     .contains { $0.localizedCaseInsensitiveContains(trimmed) }
             }
 
@@ -417,7 +417,7 @@ final class TransactionsViewController: TabRootViewController {
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Transaction> {
             cell, _, transaction in
             var content = UIListContentConfiguration.subtitleCell()
-            content.text = transaction.displayName
+            content.text = transaction.summary
             content.secondaryText = transaction.formattedDate
             cell.contentConfiguration = content
             // The amount, then the chevron the row's details are behind.

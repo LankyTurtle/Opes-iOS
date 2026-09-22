@@ -7,7 +7,7 @@ import UIKit
 /// to that account's forecast, so a transaction is a way into the balance it
 /// changed rather than a dead end.
 final class TransactionDetailsViewController: UITableViewController {
-    private let transaction: Transaction
+    private var transaction: Transaction
     private let accountProvider: any AccountProviding
     private let transactionProvider: any TransactionProviding
     private let transactionStore: TransactionStore
@@ -22,6 +22,11 @@ final class TransactionDetailsViewController: UITableViewController {
     private let summaryView = TransactionSummaryView()
 
     private lazy var summaryRow = FormHostCell(view: self.summaryView)
+
+    private let displayDescriptionField = UITextField()
+    private lazy var displayDescriptionRow = FormRowCell(
+        title: "Display Description", control: self.displayDescriptionField, stretchesControl: true
+    )
 
     private lazy var deleteRow: UITableViewCell = {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
@@ -78,16 +83,58 @@ final class TransactionDetailsViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.title = self.transaction.merchant
-        // The merchant is already the bar's title; a large one repeating it directly
+        // The name is already the bar’s title; a large one repeating it directly
         // above the same name on the card reads as a stutter.
         self.navigationItem.largeTitleDisplayMode = .never
+        self.tableView.keyboardDismissMode = .interactive
 
+        let field = self.displayDescriptionField
+        field.font = .preferredFont(forTextStyle: .body)
+        field.adjustsFontForContentSizeCategory = true
+        field.textAlignment = .right
+        field.autocapitalizationType = .words
+        field.clearButtonMode = .whileEditing
+        field.returnKeyType = .done
+        field.accessibilityLabel = "Display description"
+        // Clearing the field goes back to the description, so it is the hint.
+        field.placeholder = self.transaction.merchant
+        field.delegate = self
+
+        self.showTransaction()
+    }
+
+    private func showTransaction() {
+        self.title = self.transaction.displayName
+        self.displayDescriptionField.text = self.transaction.displayName
         self.summaryView.show(self.transaction)
+    }
+
+    private func rename(to name: String) {
+        // Leaving the screen ends editing; after a delete that must not save
+        // the transaction back.
+        guard !self.isDeleting else { return }
+        let renamed = self.transaction.renamed(to: name)
+        if renamed != self.transaction {
+            do {
+                try self.transactionStore.save(renamed)
+                self.transaction = renamed
+            } catch {
+                let alert = UIAlertController(
+                    title: "Couldn’t rename transaction", message: error.localizedDescription, preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                self.present(alert, animated: true)
+            }
+        }
+        // Also puts the description back when the field was left blank.
+        self.showTransaction()
     }
 
     private func makeSections() -> [DetailsSection] {
         var details: [UITableViewCell] = [
+            self.displayDescriptionRow,
+            Self.makeDetailRow(title: "Description", value: self.transaction.merchant),
+            Self.makeDetailRow(title: "Reference", value: self.transaction.reference ?? "None"),
             Self.makeDetailRow(title: "Date", value: self.transaction.formattedFullDate),
             Self.makeDetailRow(title: "Time", value: self.transaction.formattedTime),
         ]
@@ -222,6 +269,17 @@ final class TransactionDetailsViewController: UITableViewController {
     }
 }
 
+extension TransactionDetailsViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        self.rename(to: textField.text ?? "")
+    }
+}
+
 /// Everything on record from one merchant, so a single transaction can be read
 /// against the rest of them.
 private struct MerchantHistory {
@@ -314,7 +372,7 @@ private final class TransactionSummaryView: UIView {
     func show(_ transaction: Transaction) {
         let amount = ForecastFormatter.signedCurrency(transaction.amount)
 
-        self.merchantLabel.text = transaction.merchant
+        self.merchantLabel.text = transaction.displayName
         self.amountLabel.text = amount
         // Money in is picked out the way the forecast picks out a rise. Money out
         // is the ordinary case and stays in the label colour, so a screen of
@@ -323,7 +381,7 @@ private final class TransactionSummaryView: UIView {
         self.directionLabel.text = transaction.directionDescription
 
         self.accessibilityLabel =
-            "\(transaction.merchant), \(amount), \(transaction.directionDescription)"
+            "\(transaction.displayName), \(amount), \(transaction.directionDescription)"
     }
 }
 

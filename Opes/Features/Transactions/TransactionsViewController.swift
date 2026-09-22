@@ -354,7 +354,10 @@ final class TransactionsViewController: TabRootViewController {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let matches = trimmed.isEmpty
             ? self.transactions
-            : self.transactions.filter { $0.merchant.localizedCaseInsensitiveContains(trimmed) }
+            : self.transactions.filter { transaction in
+                [transaction.displayName, transaction.merchant, transaction.reference ?? ""]
+                    .contains { $0.localizedCaseInsensitiveContains(trimmed) }
+            }
 
         var snapshot = NSDiffableDataSourceSnapshot<Section, Transaction>()
         snapshot.appendSections([.main])
@@ -414,7 +417,7 @@ final class TransactionsViewController: TabRootViewController {
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Transaction> {
             cell, _, transaction in
             var content = UIListContentConfiguration.subtitleCell()
-            content.text = transaction.merchant
+            content.text = transaction.displayName
             content.secondaryText = transaction.formattedDate
             cell.contentConfiguration = content
             // The amount, then the chevron the row's details are behind.

@@ -39,6 +39,7 @@ enum TransactionCSVParser {
               let merchantColumn = try column(["description", "merchant", "transaction description", "details"]) else {
             throw ImportError(message: "The CSV needs Date and Description (or Merchant) columns.")
         }
+        let referenceColumn = try column(["reference", "ref", "transaction reference", "receipt number"])
         let amountColumn = try column(["amount", "transaction amount"])
         let debitColumn = try column(["debit", "debit amount", "withdrawal", "withdrawals"])
         let creditColumn = try column(["credit", "credit amount", "deposit", "deposits"])
@@ -92,9 +93,13 @@ enum TransactionCSVParser {
                 throw invalid("An amount is required.")
             }
             guard amount != 0 else { throw invalid("The amount must be greater or less than zero.") }
+            let reference = referenceColumn
+                .map { row[$0].trimmingCharacters(in: .whitespacesAndNewlines) }
+                .flatMap { $0.isEmpty ? nil : $0 }
             return Transaction(
                 id: UUID(), merchant: merchant, date: date, amount: amount,
-                accountID: accountID, sourceInstitution: institution
+                accountID: accountID, sourceInstitution: institution,
+                reference: reference
             )
         }
     }

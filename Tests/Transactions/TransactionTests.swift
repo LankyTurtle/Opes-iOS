@@ -66,9 +66,29 @@ enum TransactionTests {
         try self.expect(edit("062-000", 3, 0, "9") == ("062-900", 5), "Caret moves past the hyphen after the fourth digit")
     }
 
+    static func displayDescriptionChecks() throws {
+        let original = Transaction(id: UUID(), merchant: "WOOLWORTHS 1234 SYDNEY", date: .now, amount: -5, accountID: UUID(), reference: "R1")
+        try self.expect(original.displayName == "WOOLWORTHS 1234 SYDNEY", "Display description defaults to the description")
+        let renamed = original.renamed(to: "  Groceries ")
+        try self.expect(renamed.displayName == "Groceries" && renamed.merchant == original.merchant, "Renaming keeps the description")
+        try self.expect(renamed.renamed(to: " ").displayDescription == nil, "A blank name goes back to the description")
+        try self.expect(renamed.renamed(to: original.merchant).displayDescription == nil, "Repeating the description stores no name")
+        let encoded = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(renamed))
+        try self.expect(encoded == renamed, "Display description and reference persist")
+        let legacyID = UUID()
+        let legacy = try JSONDecoder().decode(Transaction.self, from: Data(#"{"id":"\#(legacyID)","merchant":"Shop","date":0,"amount":-1}"#.utf8))
+        try self.expect(legacy.displayName == "Shop" && legacy.reference == nil, "Transactions saved before display names still load")
+
+        let referenced = try self.parse("Date,Description,Reference,Amount\n20/09/2026,Shop, REF123 ,-1\n20/09/2026,Pay,,100")
+        try self.expect(referenced.map(\.reference) == ["REF123", nil], "CSV reference is trimmed and optional per row")
+        try self.expect(try self.parse("Date,Description,Amount\n20/09/2026,Shop,-1")[0].reference == nil, "CSV without a reference column")
+        try self.rejects("Reject ambiguous reference columns") { _ = try self.parse("Date,Description,Ref,Reference,Amount\n20/09/2026,Shop,1,2,-1") }
+    }
+
     static func main() throws {
         try self.bsbInputChecks()
         try self.accountFilterChecks()
+        try self.displayDescriptionChecks()
         try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")

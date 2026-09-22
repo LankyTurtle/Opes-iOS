@@ -191,6 +191,10 @@ final class HomeViewController: TabRootViewController {
             // animator has formally completed. Holding it also marks the card as
             // still on its way out, which `handleCustomiseTap` reads.
             self?.cardTransition = nil
+            // A card can change what the tiles show (a transaction renamed in
+            // its details). Refreshing only now keeps the source row in place
+            // for the card to return to.
+            self?.refreshTiles()
         }
         // `transitioningDelegate` is weak, so the transition has to be held here.
         self.cardTransition = transition

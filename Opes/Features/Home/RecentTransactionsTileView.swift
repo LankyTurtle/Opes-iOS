@@ -100,7 +100,7 @@ private final class TransactionRowControl: UIControl {
         let merchantLabel = UILabel()
         merchantLabel.font = .preferredFont(forTextStyle: .body)
         merchantLabel.adjustsFontForContentSizeCategory = true
-        merchantLabel.text = transaction.merchant
+        merchantLabel.text = transaction.displayName
 
         let dateLabel = UILabel()
         dateLabel.font = .preferredFont(forTextStyle: .footnote)
@@ -146,7 +146,7 @@ private final class TransactionRowControl: UIControl {
         self.isAccessibilityElement = true
         self.accessibilityTraits = .button
         self.accessibilityLabel =
-            "\(transaction.merchant), \(transaction.formattedAmount), \(transaction.formattedDate)"
+            "\(transaction.displayName), \(transaction.formattedAmount), \(transaction.formattedDate)"
         self.accessibilityHint = "Open the transaction's details"
 
         NSLayoutConstraint.activate([

@@ -43,6 +43,13 @@ The bottom of the transaction detail screen also offers **Delete Transaction**.
 Deleting there returns to the list or closes the Home detail card and refreshes
 the visible history.
 
+Transaction details show a **Display Description**, the original
+**Description**, and the **Reference** ("None" when the transaction has none).
+The display description starts as the description; edit it to change how the
+transaction is shown in lists, Home, pay cycles, and the details title. Clearing
+it goes back to the description, which is never changed. Search matches the
+display description, description, or reference.
+
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name, type, number, and institution to save an account locally and select it
@@ -62,7 +69,9 @@ local; there is no server upload.
 The initial importer accepts UTF-8 or BOM-marked UTF-16 CSVs up to 10 MB and
 20,000 transactions. It requires a header with `Date`, `Description` (or
 `Merchant`), and signed `Amount`, or separate positive `Debit` and `Credit`
-columns. Dates use `dd/MM/yyyy`, `yyyy-MM-dd`, `dd-MM-yyyy`, or `dd MMM yyyy`.
+columns. An optional `Reference` (or `Ref`, `Transaction Reference`, `Receipt
+Number`) column is saved with each transaction; blank cells mean no reference.
+Dates use `dd/MM/yyyy`, `yyyy-MM-dd`, `dd-MM-yyyy`, or `dd MMM yyyy`.
 Amounts are AUD with up to two decimal places. Quoted commas, escaped quotes,
 embedded newlines, CRLF, and a UTF-8 BOM are supported. The institution is saved
 with each imported transaction alongside the selected account's stable identifier. This is a common

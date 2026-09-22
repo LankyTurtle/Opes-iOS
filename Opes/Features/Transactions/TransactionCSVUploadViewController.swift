@@ -2,6 +2,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class TransactionCSVUploadViewController: UITableViewController {
+    private let accountProvider: any AccountProviding
     private var accounts: [AccountPreview]
     private let onImport: ([Transaction]) throws -> Void
     private var selectedAccount: AccountPreview?
@@ -16,8 +17,9 @@ final class TransactionCSVUploadViewController: UITableViewController {
         title: "Account", control: self.accountButton, stretchesControl: true
     )
 
-    init(accounts: [AccountPreview], onImport: @escaping ([Transaction]) throws -> Void) {
-        self.accounts = accounts
+    init(accountProvider: any AccountProviding, onImport: @escaping ([Transaction]) throws -> Void) {
+        self.accountProvider = accountProvider
+        self.accounts = accountProvider.accounts()
         self.onImport = onImport
         super.init(style: .insetGrouped)
     }
@@ -75,9 +77,40 @@ final class TransactionCSVUploadViewController: UITableViewController {
         self.navigationController?.pushViewController(editor, animated: true)
     }
 
+    /// The selected account, re-read from the store: it may have been deleted
+    /// from Accounts while this screen was open. If it has, the choice and any
+    /// preview are cleared (the file is kept) and the user is asked to pick
+    /// another account or add one.
+    private func accountStillOnFile() -> AccountPreview? {
+        guard let selectedAccount else { return nil }
+        self.accounts = self.accountProvider.accounts()
+        if let account = self.accounts.first(where: { $0.id == selectedAccount.id }) {
+            return account
+        }
+        self.selectedAccount = nil
+        self.parsedTransactions = []
+        self.refresh()
+
+        let alert = UIAlertController(
+            title: "Account No Longer Exists",
+            message: "“\(selectedAccount.name)” has been deleted. Choose another account or add a new one, then upload the file again.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Add New Account", style: .default) { [weak self] _ in
+            self?.addAccount()
+        })
+        if !self.accounts.isEmpty {
+            // The account menu is on this screen, so choosing just returns to it.
+            alert.addAction(UIAlertAction(title: "Choose Another Account", style: .default))
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        self.present(alert, animated: true)
+        return nil
+    }
+
     @objc private func confirmUpload() {
-        guard let selectedAccount, let fileData, !self.isReadingFile, !self.isParsing,
-              self.parsedTransactions.isEmpty else { return }
+        guard let fileData, !self.isReadingFile, !self.isParsing,
+              self.parsedTransactions.isEmpty, let selectedAccount = self.accountStillOnFile() else { return }
         self.isParsing = true
         self.refresh()
         let accountID = selectedAccount.id
@@ -104,7 +137,7 @@ final class TransactionCSVUploadViewController: UITableViewController {
 
     private func importTransactions() {
         guard !self.parsedTransactions.isEmpty, !self.isReadingFile, !self.isParsing, !self.isImporting else { return }
-        guard let selectedAccount,
+        guard let selectedAccount = self.accountStillOnFile(),
               self.parsedTransactions.allSatisfy({ $0.accountID == selectedAccount.id }) else { return }
         self.isImporting = true
         do {

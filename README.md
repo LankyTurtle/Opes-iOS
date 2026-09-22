@@ -66,7 +66,10 @@ Their current balance starts at zero; importing history does not derive a balanc
 Selecting the file does not parse or import it. Tap **Upload** to validate and
 parse, review the first five transactions and total count, then tap **Import**
 to save all parsed transactions linked to that account. Replacing the file or changing the account
-clears the preview. Leaving before Import discards the selection. Processing is
+clears the preview. If the selected account is deleted while the screen is open,
+**Upload** and **Import** say so, clear the account and preview (keeping the
+file), and offer **Add New Account** or **Choose Another Account**. Leaving
+before Import discards the selection. Processing is
 local; there is no server upload.
 
 The initial importer accepts UTF-8 or BOM-marked UTF-16 CSVs up to 10 MB and

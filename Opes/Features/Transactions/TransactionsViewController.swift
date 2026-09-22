@@ -194,7 +194,7 @@ final class TransactionsViewController: TabRootViewController {
     private func showCSVUpload() {
         self.dismissSearchKeyboard()
         self.navigationController?.pushViewController(
-            TransactionCSVUploadViewController(accounts: self.accountProvider.accounts()) { [weak self] transactions in
+            TransactionCSVUploadViewController(accountProvider: self.accountProvider) { [weak self] transactions in
                 guard let self else { return }
                 try self.transactionStore.save(transactions)
                 self.transactions.append(contentsOf: transactions)

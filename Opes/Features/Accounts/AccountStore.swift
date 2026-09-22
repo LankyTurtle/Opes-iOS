@@ -3,8 +3,8 @@ import Foundation
 final class AccountStore {
     static let shared = AccountStore()
     private let defaults: UserDefaults
-    private let key = "accounts.v1"
-    private let deletedIDsKey = "deletedAccounts.v1"
+    private let key = "accounts"
+    private let deletedIDsKey = "deletedAccounts"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults

@@ -24,15 +24,15 @@ struct Account: Codable, Hashable, Identifiable {
         self.balance = balance
     }
 
-    // Accounts saved before type, number, and BSB existed still decode; they
-    // read as transaction accounts with no number until the user edits them.
+    // Decoding goes through the memberwise init so a stored card account can
+    // never come back with a BSB.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             id: try container.decode(UUID.self, forKey: .id),
             name: try container.decode(String.self, forKey: .name),
-            type: try container.decodeIfPresent(AccountType.self, forKey: .type) ?? .transaction,
-            number: try container.decodeIfPresent(String.self, forKey: .number) ?? "",
+            type: try container.decode(AccountType.self, forKey: .type),
+            number: try container.decode(String.self, forKey: .number),
             bsb: try container.decodeIfPresent(String.self, forKey: .bsb),
             institution: try container.decode(String.self, forKey: .institution),
             balance: try container.decode(Decimal.self, forKey: .balance)

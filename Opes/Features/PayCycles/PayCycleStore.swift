@@ -6,7 +6,7 @@ final class PayCycleStore {
     static let shared = PayCycleStore()
 
     private let defaults: UserDefaults
-    private let key = "payCycles.v1"
+    private let key = "payCycles"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 

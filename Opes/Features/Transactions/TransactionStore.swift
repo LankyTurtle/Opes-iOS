@@ -5,10 +5,8 @@ final class TransactionStore: TransactionProviding {
     static let shared = TransactionStore()
 
     private let defaults: UserDefaults
-    // v2 renamed the fields and made the account and time flag required; v1
-    // history no longer decodes, so it is left behind rather than read.
-    private let key = "transactions.v2"
-    private let deletedAccountIDsKey = "transactionDeletedAccounts.v1"
+    private let key = "transactions"
+    private let deletedAccountIDsKey = "transactionDeletedAccounts"
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults

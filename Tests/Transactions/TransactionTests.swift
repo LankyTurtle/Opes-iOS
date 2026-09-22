@@ -25,7 +25,29 @@ enum TransactionTests {
         try TransactionCSVParser.parse(Data(csv.utf8), accountID: self.accountID, institution: "Test Bank")
     }
 
+    static func accountFilterChecks() throws {
+        var filter = AccountFilter()
+        try self.expect(!filter.isActive && filter.matches(type: .homeLoan, institution: "Any"), "Empty filter shows every account")
+        filter.toggle(.transaction)
+        try self.expect(filter.matches(type: .transaction, institution: "ANZ") && !filter.matches(type: .savings, institution: "ANZ"), "Filter by type")
+        filter.toggle(.savings)
+        try self.expect(filter.matches(type: .savings, institution: "ANZ") && !filter.matches(type: .creditCard, institution: "ANZ"), "Types within the filter widen the match")
+        filter.toggle(institution: "Macquarie")
+        try self.expect(filter.matches(type: .transaction, institution: " macquarie "), "Institutions match regardless of case and spacing")
+        try self.expect(!filter.matches(type: .transaction, institution: "ANZ"), "Type and institution narrow together")
+        try self.expect(!filter.matches(type: .creditCard, institution: "Macquarie"), "Institution alone is not enough when a type is chosen")
+        filter.toggle(institution: "ANZ")
+        try self.expect(filter.matches(type: .savings, institution: "ANZ") && filter.contains(institution: "anz"), "Institutions within the filter widen the match")
+        filter.toggle(institution: "MACQUARIE")
+        try self.expect(!filter.contains(institution: "Macquarie") && filter.isActive, "Toggling a chosen institution removes it")
+        filter.removeUnavailable(types: [.transaction], institutions: ["Westpac"])
+        try self.expect(filter.types == [.transaction] && filter.institutions.isEmpty, "Choices no account has are dropped")
+        filter.toggle(.transaction)
+        try self.expect(!filter.isActive, "Toggling every choice off clears the filter")
+    }
+
     static func main() throws {
+        try self.accountFilterChecks()
         try self.accountDeletionChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")

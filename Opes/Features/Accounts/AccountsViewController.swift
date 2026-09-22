@@ -16,6 +16,22 @@ final class AccountsViewController: TabRootViewController {
 
     private lazy var dataSource = self.makeDataSource()
 
+    /// Every account, before the filter is applied.
+    private var accounts: [AccountPreview] = []
+    private var filter = AccountFilter()
+    private lazy var filterItem: UIBarButtonItem = {
+        // Rebuilt each time it opens, so its checkmarks and options always
+        // reflect the current accounts and filter.
+        let menu = UIMenu(children: [
+            UIDeferredMenuElement.uncached { [weak self] completion in
+                completion(self?.makeFilterMenuElements() ?? [])
+            },
+        ])
+        let item = UIBarButtonItem(image: UIImage(systemName: "line.3.horizontal.decrease"), menu: menu)
+        item.accessibilityLabel = "Filter accounts"
+        return item
+    }()
+
     init(
         accountProvider: (any AccountProviding)? = nil,
         accountStore: AccountStore = .shared,
@@ -35,11 +51,15 @@ final class AccountsViewController: TabRootViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.navigationItem.rightBarButtonItem = AppBarButtonItem.add(
-            target: self,
-            action: #selector(self.addAccount),
-            accessibilityLabel: "Add account"
-        )
+        // The first item sits at the trailing edge, keeping + in its usual place.
+        self.navigationItem.rightBarButtonItems = [
+            AppBarButtonItem.add(
+                target: self,
+                action: #selector(self.addAccount),
+                accessibilityLabel: "Add account"
+            ),
+            self.filterItem,
+        ]
 
         self.collectionView.translatesAutoresizingMaskIntoConstraints = false
         self.collectionView.backgroundColor = .clear
@@ -57,34 +77,100 @@ final class AccountsViewController: TabRootViewController {
             self.collectionView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
         ])
 
-        self.apply(accounts: self.accountProvider.accounts())
+        self.reloadAccounts()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         self.navigationController?.hidesBarsOnSwipe = false
         self.navigationController?.setNavigationBarHidden(false, animated: animated)
-        self.apply(accounts: self.accountProvider.accounts())
+        self.reloadAccounts()
     }
 
     @objc private func addAccount() {
         let editor = AccountEditorViewController(store: self.accountStore) { [weak self] _ in
-            guard let self else { return }
-            self.apply(accounts: self.accountProvider.accounts())
+            self?.reloadAccounts()
         }
         self.navigationController?.pushViewController(editor, animated: true)
     }
 
-    private func apply(accounts: [AccountPreview], animated: Bool = false, completion: (() -> Void)? = nil) {
+    private func reloadAccounts() {
+        self.accounts = self.accountProvider.accounts()
+        self.applyFilter()
+    }
+
+    private func applyFilter(animated: Bool = false, completion: (() -> Void)? = nil) {
+        self.filter.removeUnavailable(
+            types: Set(self.accounts.map(\.type)), institutions: self.accounts.map(\.institution)
+        )
+        let matches = self.accounts.filter { self.filter.matches(type: $0.type, institution: $0.institution) }
         var snapshot = NSDiffableDataSourceSnapshot<Section, AccountPreview>()
         snapshot.appendSections([.main])
-        snapshot.appendItems(accounts, toSection: .main)
+        snapshot.appendItems(matches, toSection: .main)
         self.dataSource.apply(snapshot, animatingDifferences: animated, completion: completion)
+
         var empty = UIContentUnavailableConfiguration.empty()
-        empty.image = UIImage(systemName: "wallet.bifold")
-        empty.text = "No accounts"
-        empty.secondaryText = "Tap + to add an account."
-        self.contentUnavailableConfiguration = accounts.isEmpty ? empty : nil
+        if self.accounts.isEmpty {
+            empty.image = UIImage(systemName: "wallet.bifold")
+            empty.text = "No accounts"
+            empty.secondaryText = "Tap + to add an account."
+        } else {
+            empty.image = UIImage(systemName: "line.3.horizontal.decrease")
+            empty.text = "No matching accounts"
+            empty.secondaryText = "Try different filters."
+            empty.button.title = "Clear Filters"
+            empty.buttonProperties.primaryAction = UIAction { [weak self] _ in self?.clearFilter() }
+        }
+        self.contentUnavailableConfiguration = matches.isEmpty ? empty : nil
+
+        // A tinted button shows at a glance that some accounts are hidden.
+        self.filterItem.isHidden = self.accounts.isEmpty
+        self.filterItem.style = self.filter.isActive ? .prominent : .plain
+        self.filterItem.accessibilityValue = self.filter.isActive
+            ? "Showing \(matches.count) of \(self.accounts.count) accounts"
+            : nil
+    }
+
+    private func clearFilter() {
+        self.filter = AccountFilter()
+        self.applyFilter(animated: true)
+    }
+
+    private func makeFilterMenuElements() -> [UIMenuElement] {
+        // Only offer choices some account has; an option that could only ever
+        // produce an empty list is noise.
+        let typeActions = AccountType.allCases
+            .filter { type in self.accounts.contains { $0.type == type } }
+            .map { type in
+                UIAction(title: type.title, state: self.filter.types.contains(type) ? .on : .off) { [weak self] _ in
+                    self?.filter.toggle(type)
+                    self?.applyFilter(animated: true)
+                }
+            }
+        var seenInstitutions = Set<String>()
+        let institutionActions = self.accounts.map(\.institution)
+            .filter { seenInstitutions.insert(AccountFilter.institutionKey($0)).inserted }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .map { institution in
+                UIAction(
+                    title: institution, state: self.filter.contains(institution: institution) ? .on : .off
+                ) { [weak self] _ in
+                    self?.filter.toggle(institution: institution)
+                    self?.applyFilter(animated: true)
+                }
+            }
+        var elements: [UIMenuElement] = [
+            UIMenu(title: "Type", options: .displayInline, children: typeActions),
+            UIMenu(title: "Institution", options: .displayInline, children: institutionActions),
+        ]
+        if self.filter.isActive {
+            elements.append(UIMenu(options: .displayInline, children: [
+                UIAction(title: "Clear Filters", image: UIImage(systemName: "xmark.circle")) { [weak self] _ in
+                    self?.clearFilter()
+                },
+            ]))
+        }
+        return elements
     }
 
     private func makeLayout() -> UICollectionViewLayout {
@@ -95,10 +181,8 @@ final class AccountsViewController: TabRootViewController {
                 guard let self else { completion(false); return }
                 do {
                     try self.accountStore.delete(id: account.id, transactionStore: self.transactionStore)
-                    self.apply(
-                        accounts: self.dataSource.snapshot().itemIdentifiers.filter { $0.id != account.id },
-                        animated: true
-                    ) { completion(true) }
+                    self.accounts.removeAll { $0.id == account.id }
+                    self.applyFilter(animated: true) { completion(true) }
                 } catch {
                     completion(false)
                     let alert = UIAlertController(

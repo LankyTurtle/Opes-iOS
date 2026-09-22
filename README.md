@@ -23,6 +23,14 @@ On Accounts, tap **+** to add an account. Swipe left on an account to reveal
 persist across launches. Other accounts and
 their history are preserved.
 
+Tap the filter button beside **+** to show only certain account types or
+institutions. Choose more than one option to combine them: choices within Type
+or Institution widen the list (Transaction or Savings), while choices across
+both narrow it (Transaction accounts at Macquarie). Institutions match
+regardless of case. The button is tinted while a filter is on; choose **Clear
+Filters** in the menu, or in the empty list, to show every account again.
+Filters reset when the app relaunches.
+
 On Transactions, tap **+** to choose **Add Manually** or **Upload CSV**.
 Manual entry supports an AUD amount, money in/out, date, merchant/description,
 and a required account. Saved transactions also appear in Home and the

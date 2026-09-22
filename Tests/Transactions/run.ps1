@@ -6,6 +6,7 @@ $sources = @(
     'Tests/Transactions/TransactionTests.swift',
     'Opes/Features/Accounts/Account.swift',
     'Opes/Features/Accounts/AccountStore.swift',
+    'Opes/Features/Accounts/AccountFilter.swift',
     'Opes/Features/Transactions/Transaction.swift',
     'Opes/Features/Transactions/TransactionAmount.swift',
     'Opes/Features/Transactions/TransactionStore.swift',

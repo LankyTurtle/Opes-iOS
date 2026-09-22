@@ -25,7 +25,7 @@ final class TransactionDetailsViewController: UITableViewController {
 
     private let displayDescriptionField = UITextField()
     private lazy var displayDescriptionRow = FormRowCell(
-        title: "Display Description", control: self.displayDescriptionField, stretchesControl: true
+        title: "Summary", control: self.displayDescriptionField, stretchesControl: true
     )
 
     private lazy var deleteRow: UITableViewCell = {
@@ -95,7 +95,7 @@ final class TransactionDetailsViewController: UITableViewController {
         field.autocapitalizationType = .words
         field.clearButtonMode = .whileEditing
         field.returnKeyType = .done
-        field.accessibilityLabel = "Display description"
+        field.accessibilityLabel = "Summary"
         // Clearing the field goes back to the description, so it is the hint.
         field.placeholder = self.transaction.merchant
         field.delegate = self

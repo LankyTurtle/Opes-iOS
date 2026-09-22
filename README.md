@@ -48,12 +48,12 @@ a sign, and when it happened (`Tue 22 Sep 2026, 3:45 pm`). CSV imports carry
 no time, so they show only the date, here and in lists; older imports saved at
 midnight are treated the same way.
 
-Below that, details show a **Display Description**, the original
+Below that, details show a **Summary**, the original
 **Description**, and the **Reference** ("None" when the transaction has none).
-The display description starts as the description; edit it to change how the
+The summary starts as the description; edit it to change how the
 transaction is shown in lists, Home, pay cycles, and the details title. Clearing
 it goes back to the description, which is never changed. Search matches the
-display description, description, or reference.
+summary, description, or reference.
 
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a

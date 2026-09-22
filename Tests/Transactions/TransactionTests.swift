@@ -68,13 +68,13 @@ enum TransactionTests {
 
     static func displayDescriptionChecks() throws {
         let original = Transaction(id: UUID(), merchant: "WOOLWORTHS 1234 SYDNEY", date: .now, amount: -5, accountID: UUID(), reference: "R1")
-        try self.expect(original.displayName == "WOOLWORTHS 1234 SYDNEY", "Display description defaults to the description")
+        try self.expect(original.displayName == "WOOLWORTHS 1234 SYDNEY", "Summary defaults to the description")
         let renamed = original.renamed(to: "  Groceries ")
         try self.expect(renamed.displayName == "Groceries" && renamed.merchant == original.merchant, "Renaming keeps the description")
         try self.expect(renamed.renamed(to: " ").displayDescription == nil, "A blank name goes back to the description")
         try self.expect(renamed.renamed(to: original.merchant).displayDescription == nil, "Repeating the description stores no name")
         let encoded = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(renamed))
-        try self.expect(encoded == renamed, "Display description and reference persist")
+        try self.expect(encoded == renamed, "Summary and reference persist")
         let legacyID = UUID()
         let legacy = try JSONDecoder().decode(Transaction.self, from: Data(#"{"id":"\#(legacyID)","merchant":"Shop","date":0,"amount":-1}"#.utf8))
         try self.expect(legacy.displayName == "Shop" && legacy.reference == nil, "Transactions saved before display names still load")

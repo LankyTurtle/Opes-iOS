@@ -181,7 +181,7 @@ final class TransactionsViewController: TabRootViewController {
 
     private func showManualEntry() {
         self.dismissSearchKeyboard()
-        let editor = TransactionEditorViewController(accounts: self.accountProvider.accounts()) { [weak self] transaction in
+        let editor = TransactionEditorViewController(accountProvider: self.accountProvider) { [weak self] transaction in
             guard let self else { return }
             try self.transactionStore.save(transaction)
             self.transactions.insert(transaction, at: 0)

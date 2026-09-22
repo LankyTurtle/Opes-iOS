@@ -33,7 +33,9 @@ Filters reset when the app relaunches.
 
 On Transactions, tap **+** to choose **Add Manually** or **Upload CSV**.
 Manual entry supports an AUD amount, money in/out, date and time, description,
-and a required account. Saved transactions also appear in Home and the
+and a required account. If that account is deleted while the screen is open,
+**Save** says so, clears the account (keeping everything else entered), and
+offers **Add New Account** or **Choose Another Account**. Saved transactions also appear in Home and the
 transaction providers used by forecasts and pay cycles.
 
 Swipe left on a transaction to reveal **Delete**, or swipe fully to delete it.

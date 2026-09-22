@@ -1,6 +1,7 @@
 import UIKit
 
 final class TransactionEditorViewController: UITableViewController {
+    private let accountProvider: any AccountProviding
     private var accounts: [AccountPreview]
     private let onSave: (Transaction) throws -> Void
     private var accountID: AccountPreview.ID?
@@ -18,8 +19,9 @@ final class TransactionEditorViewController: UITableViewController {
         FormRowCell(title: "Account", control: self.accountButton, stretchesControl: true),
     ]
 
-    init(accounts: [AccountPreview], onSave: @escaping (Transaction) throws -> Void) {
-        self.accounts = accounts
+    init(accountProvider: any AccountProviding, onSave: @escaping (Transaction) throws -> Void) {
+        self.accountProvider = accountProvider
+        self.accounts = accountProvider.accounts()
         self.onSave = onSave
         super.init(style: .insetGrouped)
     }
@@ -102,6 +104,38 @@ final class TransactionEditorViewController: UITableViewController {
         self.navigationController?.pushViewController(editor, animated: true)
     }
 
+    /// The selected account, re-read from the store: it may have been deleted
+    /// from Accounts while this screen was open. If it has, the choice is
+    /// cleared (everything else entered is kept) and the user is asked to pick
+    /// another account or add one.
+    private func accountStillOnFile() -> AccountPreview? {
+        guard let accountID else { return nil }
+        let name = self.accounts.first { $0.id == accountID }?.name
+        self.accounts = self.accountProvider.accounts()
+        if let account = self.accounts.first(where: { $0.id == accountID }) {
+            return account
+        }
+        self.accountID = nil
+        self.configureAccountMenu()
+        self.view.endEditing(true)
+
+        let alert = UIAlertController(
+            title: "Account No Longer Exists",
+            message: "\(name.map { "“\($0)”" } ?? "The selected account") has been deleted. Choose another account or add a new one, then save the transaction again.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "Add New Account", style: .default) { [weak self] _ in
+            self?.addAccount()
+        })
+        if !self.accounts.isEmpty {
+            // The account menu is on this screen, so choosing just returns to it.
+            alert.addAction(UIAlertAction(title: "Choose Another Account", style: .default))
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        self.present(alert, animated: true)
+        return nil
+    }
+
     @objc private func validateForm() {
         self.navigationItem.rightBarButtonItem?.isEnabled =
             !(self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -112,7 +146,7 @@ final class TransactionEditorViewController: UITableViewController {
     @objc private func save() {
         let description = (self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !description.isEmpty, let amount = TransactionAmount.parse(self.amountField.text ?? ""),
-              let account = self.accounts.first(where: { $0.id == self.accountID }) else {
+              let account = self.accountStillOnFile() else {
             return
         }
         do {

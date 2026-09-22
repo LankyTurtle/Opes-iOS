@@ -469,6 +469,10 @@ final class TransactionsViewController: TabRootViewController {
             cell, _, transaction in
             var content = UIListContentConfiguration.subtitleCell()
             content.text = transaction.summary
+            // One line, cut with an ellipsis at whatever width the row has. The
+            // full summary is in details, and VoiceOver still reads all of it.
+            content.textProperties.numberOfLines = 1
+            content.textProperties.lineBreakMode = .byTruncatingTail
             content.secondaryText = transaction.formattedDate
             if transaction.amount < 0 {
                 var categories = transaction.allocations.map { $0.category.rawValue }

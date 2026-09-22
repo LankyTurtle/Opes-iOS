@@ -218,6 +218,11 @@ final class TransactionCSVUploadViewController: UITableViewController {
                 content.text = transaction.summary
                 content.secondaryText = "\(transaction.date.formatted(date: .abbreviated, time: .omitted)) · \(transaction.formattedAmount)"
                 cell.selectionStyle = .none
+                // Matches the Transactions list: the summary stays on one line.
+                content.textProperties.numberOfLines = 1
+                content.textProperties.lineBreakMode = .byTruncatingTail
+                cell.contentConfiguration = content
+                return cell
             }
             content.textProperties.numberOfLines = 0
             cell.contentConfiguration = content

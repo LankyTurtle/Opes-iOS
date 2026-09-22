@@ -54,7 +54,8 @@ Below that, details show a **Summary**, the original
 The summary starts as the description; edit it to change how the
 transaction is shown in lists, Home, pay cycles, and the details title. Clearing
 it goes back to the description, which is never changed. Search matches the
-summary, description, or reference.
+summary, description, or reference. In lists the summary stays on one line and
+ends in an ellipsis when it is too long for the row.
 
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a

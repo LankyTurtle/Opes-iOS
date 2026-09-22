@@ -14,6 +14,18 @@ struct AccountPreview: Hashable, Identifiable {
     var formattedBalance: String {
         self.balance.formatted(.currency(code: "AUD"))
     }
+
+    /// The full account number, or only the last four digits of a card number.
+    /// `nil` for accounts saved before numbers were recorded.
+    var displayNumber: String? {
+        guard !self.number.isEmpty else { return nil }
+        return self.type.hasBSB ? self.number : "•••• \(self.number.suffix(4))"
+    }
+
+    /// The institution, followed by the account number when there is one.
+    var subtitle: String {
+        [self.institution, self.displayNumber].compactMap { $0 }.joined(separator: " · ")
+    }
 }
 
 /// Screens depend on this small read interface instead of a particular local

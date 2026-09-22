@@ -157,7 +157,7 @@ final class AccountSelectionViewController: UIViewController {
             var content = UIListContentConfiguration.subtitleCell()
             content.image = account.institutionLogo
             content.text = account.name
-            content.secondaryText = account.institution
+            content.secondaryText = account.subtitle
             cell.contentConfiguration = content
 
             var accessories: [UICellAccessory] = [.label(text: account.formattedBalance)]

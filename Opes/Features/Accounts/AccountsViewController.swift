@@ -122,7 +122,7 @@ final class AccountsViewController: TabRootViewController {
             var content = UIListContentConfiguration.subtitleCell()
             content.image = account.institutionLogo
             content.text = account.name
-            content.secondaryText = "\(account.institution) · \(account.type.title)"
+            content.secondaryText = account.subtitle
             cell.contentConfiguration = content
             // The balance, then the chevron the row's forecast is behind.
             cell.accessories = [.label(text: account.formattedBalance), .disclosureIndicator()]

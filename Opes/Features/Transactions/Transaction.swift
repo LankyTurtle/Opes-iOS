@@ -65,13 +65,13 @@ struct Transaction: Codable, Hashable, Identifiable {
         self.date.formatted(date: .abbreviated, time: self.hasTime ? .shortened : .omitted)
     }
 
-    /// When the transaction happened, as `Tue, 22 Sep 2026`, with the time after
+    /// When the transaction happened, as `Tue 22 Sep 2026`, with the time after
     /// it only when one was recorded.
     func formattedOccurrence(locale: Locale = .current, timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
-        formatter.dateFormat = "EEE, dd MMM yyyy"
+        formatter.dateFormat = "EEE dd MMM yyyy"
         let day = formatter.string(from: self.date)
         guard self.hasTime else { return day }
         formatter.dateFormat = nil

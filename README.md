@@ -44,7 +44,7 @@ Deleting there returns to the list or closes the Home detail card and refreshes
 the visible history.
 
 The top of transaction details shows **Debit** or **Credit**, the amount without
-a sign, and when it happened (`Tue, 22 Sep 2026, 3:45 pm`). CSV imports carry
+a sign, and when it happened (`Tue 22 Sep 2026, 3:45 pm`). CSV imports carry
 no time, so they show only the date, here and in lists; older imports saved at
 midnight are treated the same way.
 

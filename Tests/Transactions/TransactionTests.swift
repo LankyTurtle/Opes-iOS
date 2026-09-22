@@ -90,13 +90,13 @@ enum TransactionTests {
         let sydney = TimeZone(identifier: "Australia/Sydney")!
         let imported = try self.parse("Date,Description,Amount\n20/09/2026,Shop,-1")[0]
         try self.expect(!imported.hasTime, "CSV dates carry no time")
-        try self.expect(imported.formattedOccurrence(locale: au) == "Sun, 20 Sep 2026", "Date-only transactions show just the day")
+        try self.expect(imported.formattedOccurrence(locale: au) == "Sun 20 Sep 2026", "Date-only transactions show just the day")
         try self.expect(imported.directionDescription == "Debit", "Money out is a debit")
         var components = DateComponents(year: 2026, month: 9, day: 5, hour: 15, minute: 45)
         components.timeZone = sydney
         let manual = Transaction(id: UUID(), merchant: "Pay", date: Calendar(identifier: .gregorian).date(from: components)!, amount: 10, accountID: UUID())
         let occurrence = manual.formattedOccurrence(locale: au, timeZone: sydney)
-        try self.expect(manual.hasTime && occurrence.hasPrefix("Sat, 05 Sep 2026, 3:45"), "Manual transactions show the day and time: \(occurrence)")
+        try self.expect(manual.hasTime && occurrence.hasPrefix("Sat 05 Sep 2026, 3:45"), "Manual transactions show the day and time: \(occurrence)")
         try self.expect(manual.directionDescription == "Credit", "Money in is a credit")
         let legacy = try JSONDecoder().decode(Transaction.self, from: JSONEncoder().encode(imported).replacingTimeRecorded())
         try self.expect(!legacy.hasTime, "Older imports at midnight read as having no time")

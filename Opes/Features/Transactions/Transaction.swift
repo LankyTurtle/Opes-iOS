@@ -21,7 +21,7 @@ struct Transaction: Codable, Hashable, Identifiable {
 
     var allocations: [TransactionAllocation] { self.categoryAllocations ?? [] }
     var unallocatedAmount: Decimal {
-        max(0, -self.amount - self.allocations.reduce(Decimal.zero) { $0 + $1.amount })
+        max(0, abs(self.amount) - self.allocations.reduce(Decimal.zero) { $0 + $1.amount })
     }
 
     func withAllocations(_ allocations: [TransactionAllocation]) throws -> Transaction {
@@ -34,7 +34,7 @@ struct Transaction: Codable, Hashable, Identifiable {
     func validateAllocations() throws {
         guard !self.allocations.isEmpty else { return }
         let total = self.allocations.reduce(Decimal.zero) { $0 + $1.amount }
-        guard self.amount < 0, total <= -self.amount,
+        guard total <= abs(self.amount),
               Set(self.allocations.map(\.category)).count == self.allocations.count,
               self.allocations.allSatisfy({ allocation in
                   var amount = allocation.amount

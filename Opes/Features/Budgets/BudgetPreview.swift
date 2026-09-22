@@ -1,8 +1,9 @@
 import UIKit
 
-/// Budget presentation with spending calculated from saved expense allocations.
+/// Budget presentation with spending calculated from saved category allocations,
+/// net of categorised credits such as refunds.
 struct BudgetPreview: Hashable, Identifiable {
-    typealias Category = ExpenseCategory
+    typealias Category = TransactionCategory
 
     let category: Category
     let spent: Decimal

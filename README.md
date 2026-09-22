@@ -57,6 +57,10 @@ it goes back to the description, which is never changed. Search matches the
 summary, description, or reference. In lists the summary stays on one line and
 ends in an ellipsis when it is too long for the row.
 
+Any transaction, debit or credit, can be given one category or split across
+several, up to its amount. In budgets, categorised credits such as refunds
+reduce that category's spending, never below zero.
+
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name, type, institution, and number to save an account locally and select it

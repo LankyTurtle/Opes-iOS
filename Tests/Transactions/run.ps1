@@ -10,7 +10,7 @@ $sources = @(
     'Opes/Features/Accounts/AccountFilter.swift',
     'Opes/Features/Accounts/BSBInput.swift',
     'Opes/Features/Transactions/Transaction.swift',
-    'Opes/Features/Transactions/ExpenseCategory.swift',
+    'Opes/Features/Transactions/TransactionCategory.swift',
     'Opes/Features/Transactions/TransactionAmount.swift',
     'Opes/Features/Transactions/TransactionStore.swift',
     'Opes/Features/Transactions/TransactionCSVAttachment.swift',

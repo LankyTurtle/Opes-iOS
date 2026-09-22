@@ -1,6 +1,6 @@
 import Foundation
 
-enum ExpenseCategory: String, Codable, CaseIterable, Hashable {
+enum TransactionCategory: String, Codable, CaseIterable, Hashable {
     case dining = "Dining"
     case entertainment = "Entertainment"
     case groceries = "Groceries"
@@ -21,7 +21,7 @@ enum ExpenseCategory: String, Codable, CaseIterable, Hashable {
 }
 
 struct TransactionAllocation: Codable, Hashable {
-    let category: ExpenseCategory
+    let category: TransactionCategory
     /// Positive AUD amount assigned to this category.
     let amount: Decimal
 }
@@ -29,31 +29,32 @@ struct TransactionAllocation: Codable, Hashable {
 enum AllocationError: LocalizedError {
     case invalid
     var errorDescription: String? {
-        "Use positive amounts with up to two decimal places, one per category. The total cannot exceed the expense amount."
+        "Use positive amounts with up to two decimal places, one per category. The total cannot exceed the transaction amount."
     }
 }
 
 enum CategorySpending {
-    static func totals(in transactions: [Transaction], during period: DateInterval) -> [ExpenseCategory: Decimal] {
-        var totals: [ExpenseCategory: Decimal] = [:]
-        for transaction in transactions where transaction.amount < 0
-            && transaction.date >= period.start && transaction.date < period.end {
+    /// Debits add to a category and credits, such as refunds, take away from
+    /// it. A category never shows less than nothing spent.
+    static func totals(in transactions: [Transaction], during period: DateInterval) -> [TransactionCategory: Decimal] {
+        var totals: [TransactionCategory: Decimal] = [:]
+        for transaction in transactions where transaction.date >= period.start && transaction.date < period.end {
             for allocation in transaction.allocations {
-                totals[allocation.category, default: 0] += allocation.amount
+                totals[allocation.category, default: 0] += transaction.isMoneyIn ? -allocation.amount : allocation.amount
             }
         }
-        return totals
+        return totals.mapValues { max($0, 0) }
     }
 }
 
 struct TransactionCategoryFilter {
-    var categories: Set<ExpenseCategory> = []
+    var categories: Set<TransactionCategory> = []
     var includesUncategorised = false
     var isActive: Bool { !self.categories.isEmpty || self.includesUncategorised }
 
     func matches(_ transaction: Transaction) -> Bool {
         !self.isActive
             || transaction.allocations.contains { self.categories.contains($0.category) }
-            || (self.includesUncategorised && transaction.amount < 0 && transaction.unallocatedAmount > 0)
+            || (self.includesUncategorised && transaction.unallocatedAmount > 0)
     }
 }

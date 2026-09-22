@@ -65,7 +65,7 @@ final class TransactionEditorViewController: UITableViewController {
         self.categoryButton.titleLabel?.adjustsFontForContentSizeCategory = true
         self.categoryButton.titleLabel?.numberOfLines = 0
         self.categoryButton.contentHorizontalAlignment = .trailing
-        self.categoryButton.accessibilityLabel = "Expense categories"
+        self.categoryButton.accessibilityLabel = "Categories"
         self.categoryButton.addTarget(self, action: #selector(self.editCategories), for: .touchUpInside)
         self.datePicker.datePickerMode = .dateAndTime
         self.datePicker.preferredDatePickerStyle = .compact
@@ -147,11 +147,11 @@ final class TransactionEditorViewController: UITableViewController {
     }
 
     @objc private func validateForm() {
-        let isExpense = self.directionControl.selectedSegmentIndex == 0
-        self.categoryButton.isEnabled = isExpense && TransactionAmount.parse(self.amountField.text ?? "") != nil
-        self.categoryButton.setTitle(isExpense
-            ? (self.allocations.isEmpty ? "Uncategorised" : self.allocations.map { $0.category.rawValue }.joined(separator: ", "))
-            : "Expenses only", for: .normal)
+        self.categoryButton.isEnabled = TransactionAmount.parse(self.amountField.text ?? "") != nil
+        self.categoryButton.setTitle(
+            self.allocations.isEmpty ? "Uncategorised" : self.allocations.map { $0.category.rawValue }.joined(separator: ", "),
+            for: .normal
+        )
         self.navigationItem.rightBarButtonItem?.isEnabled =
             !(self.descriptionField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && TransactionAmount.parse(self.amountField.text ?? "") != nil
@@ -169,7 +169,7 @@ final class TransactionEditorViewController: UITableViewController {
                 id: UUID(), description: description, date: self.datePicker.date,
                 amount: self.directionControl.selectedSegmentIndex == 0 ? -amount : amount,
                 accountID: account.id
-            ).withAllocations(self.directionControl.selectedSegmentIndex == 0 ? self.allocations : [])
+            ).withAllocations(self.allocations)
             try self.onSave(transaction)
             self.navigationController?.popViewController(animated: true)
         } catch {
@@ -182,11 +182,12 @@ final class TransactionEditorViewController: UITableViewController {
     }
 
     @objc private func editCategories() {
-        guard let amount = TransactionAmount.parse(self.amountField.text ?? ""),
-              self.directionControl.selectedSegmentIndex == 0 else { return }
+        guard let amount = TransactionAmount.parse(self.amountField.text ?? "") else { return }
         self.view.endEditing(true)
         let draft = Transaction(id: UUID(), description: self.descriptionField.text ?? "",
-                                date: self.datePicker.date, amount: -amount, accountID: self.accountID ?? UUID())
+                                date: self.datePicker.date,
+                                amount: self.directionControl.selectedSegmentIndex == 0 ? -amount : amount,
+                                accountID: self.accountID ?? UUID())
         // An amount edit may make the previous split too large; let the user
         // correct it in the editor instead of dropping their allocations.
         let editor = TransactionCategoriesViewController(

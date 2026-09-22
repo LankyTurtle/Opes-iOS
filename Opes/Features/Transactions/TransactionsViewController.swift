@@ -408,7 +408,7 @@ final class TransactionsViewController: TabRootViewController {
     }
 
     private func categoryFilterActions() -> [UIMenuElement] {
-        var actions: [UIMenuElement] = ExpenseCategory.allCases.map { category in
+        var actions: [UIMenuElement] = TransactionCategory.allCases.map { category in
             UIAction(title: category.rawValue, image: UIImage(systemName: category.symbolName),
                      state: self.categoryFilter.categories.contains(category) ? .on : .off) { [weak self] _ in
                 guard let self else { return }
@@ -418,7 +418,7 @@ final class TransactionsViewController: TabRootViewController {
                 self.apply(query: self.searchBar.text ?? "", animated: true)
             }
         }
-        actions.append(UIAction(title: "Uncategorised expenses",
+        actions.append(UIAction(title: "Uncategorised",
                                 state: self.categoryFilter.includesUncategorised ? .on : .off) { [weak self] _ in
             guard let self else { return }
             self.categoryFilter.includesUncategorised.toggle()
@@ -473,13 +473,10 @@ final class TransactionsViewController: TabRootViewController {
             // full summary is in details, and VoiceOver still reads all of it.
             content.textProperties.numberOfLines = 1
             content.textProperties.lineBreakMode = .byTruncatingTail
-            content.secondaryText = transaction.formattedDate
-            if transaction.amount < 0 {
-                var categories = transaction.allocations.map { $0.category.rawValue }
-                if transaction.unallocatedAmount > 0 { categories.append("Uncategorised") }
-                content.secondaryText = "\(transaction.formattedDate) · \(categories.joined(separator: ", "))"
-                content.secondaryTextProperties.numberOfLines = 0
-            }
+            var categories = transaction.allocations.map { $0.category.rawValue }
+            if transaction.unallocatedAmount > 0 { categories.append("Uncategorised") }
+            content.secondaryText = "\(transaction.formattedDate) · \(categories.joined(separator: ", "))"
+            content.secondaryTextProperties.numberOfLines = 0
             cell.contentConfiguration = content
             // The amount, then the chevron the row's details are behind.
             cell.accessories = [

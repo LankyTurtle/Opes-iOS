@@ -6,8 +6,8 @@ final class TransactionCategoriesViewController: UITableViewController {
     private let initialAllocations: [TransactionAllocation]
     private let onSave: ([TransactionAllocation]) throws -> Void
     private let mode = UISegmentedControl(items: ["One category", "Split amount"])
-    private var selectedCategory: ExpenseCategory?
-    private let categories = ExpenseCategory.allCases
+    private var selectedCategory: TransactionCategory?
+    private let categories = TransactionCategory.allCases
     private var fields: [UITextField] = []
     private var amountRows: [UITableViewCell] = []
     private let statusLabel = UILabel()
@@ -34,7 +34,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         )
         self.tableView.keyboardDismissMode = .interactive
         let allocations = self.initialAllocations
-        let isSingle = allocations.count == 1 && allocations[0].amount == -self.transaction.amount
+        let isSingle = allocations.count == 1 && allocations[0].amount == abs(self.transaction.amount)
         self.selectedCategory = isSingle ? allocations.first?.category : nil
         self.mode.selectedSegmentIndex = allocations.isEmpty || isSingle ? 0 : 1
         self.mode.addTarget(self, action: #selector(self.changeMode), for: .valueChanged)
@@ -66,7 +66,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         if self.mode.selectedSegmentIndex == 1, let category = self.selectedCategory {
             for (index, value) in self.categories.enumerated() {
                 self.fields[index].text = value == category
-                    ? (-self.transaction.amount).formatted(.number.grouping(.never)) : nil
+                    ? abs(self.transaction.amount).formatted(.number.grouping(.never)) : nil
             }
         }
         self.tableView.reloadData()
@@ -77,7 +77,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         let allocations: [TransactionAllocation]
         if self.mode.selectedSegmentIndex == 0 {
             allocations = self.selectedCategory.map {
-                [TransactionAllocation(category: $0, amount: -self.transaction.amount)]
+                [TransactionAllocation(category: $0, amount: abs(self.transaction.amount))]
             } ?? []
         } else {
             allocations = try self.categories.enumerated().compactMap { index, category in
@@ -95,7 +95,7 @@ final class TransactionCategoriesViewController: UITableViewController {
         do {
             let allocations = try self.draft()
             let total = allocations.reduce(Decimal.zero) { $0 + $1.amount }
-            let remaining = -self.transaction.amount - total
+            let remaining = abs(self.transaction.amount) - total
             self.statusLabel.text = "\(total.formatted(.currency(code: "AUD"))) allocated\n\(remaining.formatted(.currency(code: "AUD"))) uncategorised"
             self.statusLabel.textColor = .secondaryLabel
             self.navigationItem.rightBarButtonItem?.isEnabled = true
@@ -143,12 +143,12 @@ final class TransactionCategoriesViewController: UITableViewController {
         self.validateForm()
     }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        section == 1 ? "Expense: \((-self.transaction.amount).formatted(.currency(code: "AUD")))" : nil
+        section == 1 ? "\(self.transaction.directionDescription):\(abs(self.transaction.amount).formatted(.currency(code: "AUD")))" : nil
     }
     override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
         guard section == 1 else { return nil }
         return self.mode.selectedSegmentIndex == 0
-            ? "Choose a category for the whole expense, or split the amount across categories."
-            : "Enter an amount for each category you need. Leave unused categories blank. Only allocated amounts count toward budgets."
+            ? "Choose a category for the whole transaction, or split the amount across categories."
+            : "Enter an amount for each category you need. Leave unused categories blank. Only allocated amounts count toward budgets; credits, such as refunds, reduce that category’s spending."
     }
 }

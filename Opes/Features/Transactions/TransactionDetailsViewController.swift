@@ -165,10 +165,8 @@ final class TransactionDetailsViewController: UITableViewController {
         var sections: [DetailsSection] = [
             DetailsSection(rows: [self.headlineRow]),
             DetailsSection(header: "Details", rows: details),
+            DetailsSection(header: "Budget allocation", rows: [self.categoriesRow]),
         ]
-        if self.transaction.amount < 0 {
-            sections.append(DetailsSection(header: "Budget allocation", rows: [self.categoriesRow]))
-        }
 
         // With one transaction on record the totals only restate the card above, so
         // the section waits until there is a history to summarise.

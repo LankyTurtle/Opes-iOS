@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 /// Net worth, or one account's balance: where it has been over the past year, and
@@ -44,7 +45,6 @@ final class ForecastViewController: UITableViewController {
     private var recurringRows: [(cell: UITableViewCell, key: RecurrenceKey)] = []
 
     private let summaryView = ForecastSummaryView()
-    private let chartView = ForecastChartView()
     private let horizonControl = UISegmentedControl(
         items: ForecastHorizon.allCases.map(\.title)
     )
@@ -54,7 +54,12 @@ final class ForecastViewController: UITableViewController {
     private let netLabel = ForecastViewController.makeValueLabel()
 
     private lazy var summaryRow = FormHostCell(view: self.summaryView)
-    private lazy var chartRow = FormHostCell(view: self.chartView)
+    /// Holds the chart as its content configuration, replaced as the forecast moves.
+    private let chartRow: UITableViewCell = {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.selectionStyle = .none
+        return cell
+    }()
     private lazy var horizonControlView = FormControlView(control: self.horizonControl)
 
     private lazy var incomeRow = FormRowCell(
@@ -244,9 +249,13 @@ final class ForecastViewController: UITableViewController {
             title: self.subject.summaryTitle, forecast: self.forecast, includesProjection: includesProjection
         )
 
-        self.chartView.accentColor = Self.accentColor(for: self.forecast)
-        self.chartView.show(self.forecast, placeholder: "Not enough information to draw a forecast yet.")
-        self.chartView.accessibilityLabel = Self.chartDescription(for: self.forecast)
+        let chart = ForecastChart(
+            forecast: self.forecast,
+            accentColor: Self.accentColor(for: self.forecast),
+            placeholder: "Not enough information to draw a forecast yet.",
+            accessibilityDescription: Self.chartDescription(for: self.forecast)
+        )
+        self.chartRow.contentConfiguration = UIHostingConfiguration { chart }
 
         self.incomeLabel.text = ForecastFormatter.currency(self.forecast.monthlyIncome)
         self.spendingLabel.text = ForecastFormatter.currency(self.forecast.monthlySpending)

@@ -82,7 +82,9 @@ category that is in use asks whether to move its transactions to another
 category or leave them uncategorised. Deleting a bucket with categories asks
 whether to move them to another bucket or delete them too.
 
-Forecasts list **Repeating in** and **Repeating out**: transactions on one
+Forecasts list **Repeating** money, with a switch between **Money In** and
+**Money Out** (just one list, headed **Repeating in** or **Repeating out**, when
+only one direction has any): transactions on one
 account that share a summary and direction and land on a steady rhythm. The
 last six months decide the rhythm, one gap in five may be off it (a late or
 extra payment counts once), and payments on the same day count as one. Most

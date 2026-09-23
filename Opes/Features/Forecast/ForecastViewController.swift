@@ -41,13 +41,18 @@ final class ForecastViewController: UITableViewController {
     /// when the detected set itself changes, not on every horizon tap.
     private var shownRecurring: [RecurringTransaction] = []
     private var shownPayCycleNames: [RecurrenceKey: String] = [:]
-    /// The repeat rows on show, to open the one tapped.
-    private var recurringRows: [(cell: UITableViewCell, key: RecurrenceKey)] = []
+    /// The repeat rows in both directions, to open the one tapped and to swap in
+    /// the other direction's without rebuilding them.
+    private var recurringRows: [(cell: UITableViewCell, key: RecurrenceKey, isIncome: Bool)] = []
 
     private let summaryView = ForecastSummaryView()
     private let horizonControl = UISegmentedControl(
         items: ForecastHorizon.allCases.map(\.title)
     )
+
+    /// Switches the repeats between money in and money out, so a few large bills
+    /// can't crowd out the pay and transfers coming in.
+    private let directionControl = UISegmentedControl(items: ["Money In", "Money Out"])
 
     private let incomeLabel = ForecastViewController.makeValueLabel()
     private let spendingLabel = ForecastViewController.makeValueLabel()
@@ -61,6 +66,7 @@ final class ForecastViewController: UITableViewController {
         return cell
     }()
     private lazy var horizonControlView = FormControlView(control: self.horizonControl)
+    private lazy var directionControlView = FormControlView(control: self.directionControl)
 
     private lazy var incomeRow = FormRowCell(
         title: "Expected income",
@@ -147,6 +153,14 @@ final class ForecastViewController: UITableViewController {
             for: .valueChanged
         )
 
+        self.directionControl.selectedSegmentIndex = 0
+        self.directionControl.addAction(
+            UIAction { [weak self] _ in
+                self?.directionChanged()
+            },
+            for: .valueChanged
+        )
+
         // Builds the sections as a side effect, against numbers that are already
         // in place rather than reloaded a moment later.
         self.updateForecast()
@@ -175,18 +189,31 @@ final class ForecastViewController: UITableViewController {
             ),
         ]
 
-        // Split by direction, so a few large bills can't crowd out the pay and
-        // transfers coming in.
-        self.recurringRows = []
-        for (header, isIncome) in [("Repeating in", true), ("Repeating out", false)] {
-            let repeats = self.shownRecurring.filter { $0.isIncome == isIncome }.prefix(Self.shownRecurringLimit)
-            let rows = repeats.map { item in
-                (cell: RecurrenceRows.repeatRow(for: item, payCycleName: self.shownPayCycleNames[item.key]), key: item.key)
+        self.recurringRows = [true, false].flatMap { isIncome in
+            self.shownRecurring.filter { $0.isIncome == isIncome }.prefix(Self.shownRecurringLimit).map { item in
+                (
+                    cell: RecurrenceRows.repeatRow(for: item, payCycleName: self.shownPayCycleNames[item.key]),
+                    key: item.key,
+                    isIncome: isIncome
+                )
             }
-            if !rows.isEmpty {
-                self.recurringRows += rows
-                sections.append(ForecastSection(header: header, rows: rows.map(\.cell)))
-            }
+        }
+        let hasIncoming = self.recurringRows.contains(where: \.isIncome)
+        let hasOutgoing = self.recurringRows.contains { !$0.isIncome }
+        if hasIncoming && hasOutgoing {
+            // Both directions share one list, switched by the control above it.
+            sections += [
+                ForecastSection(header: "Repeating", control: self.directionControlView),
+                ForecastSection(rows: self.shownRepeatRows, listsRepeats: true),
+            ]
+        } else if hasIncoming || hasOutgoing {
+            // Nothing to switch to, so the header says which direction this is.
+            sections.append(
+                ForecastSection(
+                    header: hasIncoming ? "Repeating in" : "Repeating out",
+                    rows: self.recurringRows.map(\.cell)
+                )
+            )
         }
 
         if case .netWorth = self.subject {
@@ -197,6 +224,18 @@ final class ForecastViewController: UITableViewController {
 
         self.sections = sections
         self.tableView.reloadData()
+    }
+
+    /// The rows for whichever direction the control has chosen.
+    private var shownRepeatRows: [UITableViewCell] {
+        let showsIncome = self.directionControl.selectedSegmentIndex == 0
+        return self.recurringRows.filter { $0.isIncome == showsIncome }.map(\.cell)
+    }
+
+    private func directionChanged() {
+        guard let section = self.sections.firstIndex(where: \.listsRepeats) else { return }
+        self.sections[section].rows = self.shownRepeatRows
+        self.tableView.reloadSections(IndexSet(integer: section), with: .automatic)
     }
 
     private func horizonChanged() {
@@ -465,4 +504,6 @@ private struct ForecastSection {
     /// The footer explaining what the projection assumes, which changes with the
     /// horizon and so is built when the table asks for it.
     var carriesAssumptionsFooter = false
+    /// The repeats for one direction, swapped for the other's by the control.
+    var listsRepeats = false
 }

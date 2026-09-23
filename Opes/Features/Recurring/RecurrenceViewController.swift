@@ -14,6 +14,13 @@ final class RecurrenceViewController: UITableViewController {
         case actions
     }
 
+    private enum TransactionRow {
+        case member(Transaction)
+        /// Shows or hides every transaction but the latest.
+        case earlier
+        case add
+    }
+
     private let key: RecurrenceKey
     private let accountProvider: any AccountProviding
     private let transactionProvider: any TransactionProviding
@@ -23,6 +30,15 @@ final class RecurrenceViewController: UITableViewController {
     private var item: RecurringTransaction?
     /// The repeat's transactions, newest first.
     private var members: [Transaction] = []
+    /// Whether the transactions before the latest are shown. Kept across reloads, so
+    /// removing one doesn't fold the list away.
+    private var showsEarlier = false
+    private let earlierRow = UITableViewCell(style: .default, reuseIdentifier: nil)
+    private let earlierChevron = UIImageView(image: UIImage(
+        systemName: "chevron.down",
+        withConfiguration: UIImage.SymbolConfiguration(textStyle: .footnote, scale: .medium)
+            .applying(UIImage.SymbolConfiguration(weight: .semibold))
+    ))
     private var summaryRow = UITableViewCell()
 
     private let amountField = UITextField()
@@ -75,6 +91,12 @@ final class RecurrenceViewController: UITableViewController {
         self.nextDatePicker.preferredDatePickerStyle = .compact
         self.nextDatePicker.accessibilityLabel = "Next payment"
         self.nextDatePicker.addAction(UIAction { [weak self] _ in self?.nextDateChanged() }, for: .valueChanged)
+
+        self.earlierChevron.tintColor = .tertiaryLabel
+        // Sized once, before any rotation, which would otherwise skew its frame.
+        self.earlierChevron.sizeToFit()
+        self.earlierRow.accessoryView = self.earlierChevron
+        self.earlierRow.accessibilityTraits = .button
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -97,6 +119,7 @@ final class RecurrenceViewController: UITableViewController {
         self.item = item
         let ids = Set(item.transactionIDs)
         self.members = transactions.filter { ids.contains($0.id) }.sorted { $0.date > $1.date }
+        self.updateEarlierRow()
         self.summaryRow = RecurrenceRows.repeatRow(for: item, showsDisclosure: false, calendar: self.calendar)
 
         let schedule = item.plan.schedule
@@ -300,11 +323,52 @@ final class RecurrenceViewController: UITableViewController {
         return changes[indexPath.row]
     }
 
+    /// The latest transaction, the row that shows the rest and, when open, the
+    /// rest, then the row to add more.
+    private var transactionRows: [TransactionRow] {
+        guard let latest = self.members.first else { return [.add] }
+        var rows: [TransactionRow] = [.member(latest)]
+        if self.members.count > 1 {
+            rows.append(.earlier)
+            if self.showsEarlier { rows += self.members.dropFirst().map(TransactionRow.member) }
+        }
+        return rows + [.add]
+    }
+
     private func member(at indexPath: IndexPath) -> Transaction? {
-        guard Section(rawValue: indexPath.section) == .transactions, self.members.indices.contains(indexPath.row) else {
+        guard Section(rawValue: indexPath.section) == .transactions,
+              self.transactionRows.indices.contains(indexPath.row),
+              case .member(let transaction) = self.transactionRows[indexPath.row] else {
             return nil
         }
-        return self.members[indexPath.row]
+        return transaction
+    }
+
+    private func updateEarlierRow() {
+        let count = self.members.count - 1
+        var content = UIListContentConfiguration.valueCell()
+        content.text = "Earlier Transactions"
+        content.secondaryText = count.formatted()
+        self.earlierRow.contentConfiguration = content
+        self.earlierRow.accessibilityLabel = "Earlier Transactions, \(count)"
+        self.earlierRow.accessibilityValue = self.showsEarlier ? "Expanded" : "Collapsed"
+        self.earlierChevron.transform = self.showsEarlier ? CGAffineTransform(rotationAngle: .pi) : .identity
+    }
+
+    /// Opens or folds the earlier transactions in place, under the latest one.
+    private func toggleEarlier() {
+        let section = Section.transactions.rawValue
+        // The earlier transactions sit after the latest and the row that shows them.
+        let paths = (2..<(self.members.count + 1)).map { IndexPath(row: $0, section: section) }
+        self.showsEarlier.toggle()
+        self.tableView.performBatchUpdates {
+            if self.showsEarlier {
+                self.tableView.insertRows(at: paths, with: .fade)
+            } else {
+                self.tableView.deleteRows(at: paths, with: .fade)
+            }
+        }
+        UIView.animate(withDuration: 0.25) { self.updateEarlierRow() }
     }
 
     private var scheduleRows: [UITableViewCell] {
@@ -324,7 +388,7 @@ final class RecurrenceViewController: UITableViewController {
         case .summary: 1
         case .schedule: self.scheduleRows.count
         case .changes: (self.item?.plan.changes.count ?? 0) + 1
-        case .transactions: self.members.count + 1
+        case .transactions: self.transactionRows.count
         case .actions: self.actionRows.count
         }
     }
@@ -351,8 +415,11 @@ final class RecurrenceViewController: UITableViewController {
             cell.accessoryType = .disclosureIndicator
             return cell
         case .transactions:
-            guard let transaction = self.member(at: indexPath) else { return self.addTransactionsRow }
-            return RecurrenceRows.transactionRow(for: transaction)
+            switch self.transactionRows[indexPath.row] {
+            case .member(let transaction): return RecurrenceRows.transactionRow(for: transaction)
+            case .earlier: return self.earlierRow
+            case .add: return self.addTransactionsRow
+            }
         }
     }
 
@@ -386,6 +453,8 @@ final class RecurrenceViewController: UITableViewController {
             self.updateRule { $0.followsTransactions = true }
         } else if cell === self.addChangeRow {
             self.editChange(nil)
+        } else if cell === self.earlierRow {
+            self.toggleEarlier()
         } else if cell === self.addTransactionsRow {
             self.addTransactions()
         } else if cell === self.undoRow {

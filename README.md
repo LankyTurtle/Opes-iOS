@@ -92,7 +92,8 @@ date yourself, or choose **Use Amount and Dates From Transactions** to go back
 to working them out. **Add Change** sets a future day from which the repeat
 stops, or lands for a different amount, on a different rhythm, or from a
 different pay day. You can have several changes, but not two on the same day.
-Swipe a transaction to remove it, or use **Add Transactions** to pick others
+Only the latest transaction shows at first; tap **Earlier Transactions** to
+expand the rest. Swipe a transaction to remove it, or use **Add Transactions** to pick others
 from the same account that move money the same way. New transactions with the
 same summary join by themselves. **Undo My Changes** returns the repeat to what
 was found. **Not a Repeat** stops projecting it for good, and its transactions

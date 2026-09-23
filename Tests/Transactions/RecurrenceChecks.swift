@@ -44,6 +44,17 @@ extension TransactionTests {
                                           historyMonths: 1, from: today)
         try self.expect(covered.expectedIncome == 0, "Money in a pay cycle already covers isn't counted twice")
 
+        // Years of history, but a 3-month chart looks back 3 months, so today falls
+        // in the middle rather than near the end; longer horizons look back a year.
+        let old = Transaction(id: UUID(), description: "Old", date: calendar.date(byAdding: .year, value: -3, to: today)!,
+                              amount: -1, accountID: self.accountID)
+        for (horizon, months) in [(ForecastHorizon.threeMonths, 3), (.sixMonths, 6), (.oneYear, 12), (.twoYears, 12)] {
+            let chart = forecaster.forecast(startingBalance: 0, transactions: [old], payCycles: [], over: horizon, from: today)
+            let back = calendar.date(byAdding: .month, value: -months, to: calendar.startOfDay(for: today))!
+            try self.expect(chart.startDate == back && chart.points[chart.todayIndex].date == calendar.startOfDay(for: today),
+                            "A \(horizon.title) chart's history runs back \(months) months to today")
+        }
+
         let pattern = SpendingPattern.make(from: rent + shop, asOf: calendar.date(byAdding: .day, value: 21, to: start)!, calendar: calendar)
         try self.expect(pattern.irregularDailyOutflow * Decimal(pattern.observedDays) == 77, "Repeats leave the irregular average; the rest stays in it")
     }

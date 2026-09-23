@@ -40,9 +40,6 @@ final class ForecastChartView: UIView {
     private static let lineWidth: CGFloat = 2
     private static let plotHeight: CGFloat = 176
     private static let labelSpacing: CGFloat = 6
-    /// How far from either edge today has to fall before its label is worth showing
-    /// rather than colliding with the dates at the ends.
-    private static let todayLabelMargin: CGFloat = 0.18
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -266,10 +263,13 @@ final class ForecastChartView: UIView {
             .cgColor
         self.todayLineLayer.isHidden = false
 
-        // Only labelled when it isn't about to sit on top of the dates at the ends.
-        let share = position / plot.width
-        self.todayLabel.isHidden = share < Self.todayLabelMargin
-            || share > 1 - Self.todayLabelMargin
+        // Only labelled with clear space either side, so it can't run into the
+        // dates at the ends and read as one of them: "Today Dec 2026".
+        let halfWidth = self.todayLabel.intrinsicContentSize.width / 2
+        let gap = DesignTokens.labelSpacing * 2
+        let clearOfStart = position - halfWidth >= self.startLabel.intrinsicContentSize.width + gap
+        let clearOfEnd = position + halfWidth <= plot.maxX - self.endLabel.intrinsicContentSize.width - gap
+        self.todayLabel.isHidden = !(clearOfStart && clearOfEnd)
 
         if self.todayLabelCentre.constant != position {
             self.todayLabelCentre.constant = position

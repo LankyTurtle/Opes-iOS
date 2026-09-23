@@ -153,13 +153,16 @@ struct BalanceForecaster {
     /// `transactions`, `payCycles`, and `recurrenceRules` are expected to be
     /// narrowed to the position already: one account's, or every account's for a
     /// net worth.
+    ///
+    /// The history looks back as far as the horizon looks ahead, up to a year, so
+    /// today sits in the middle of the chart rather than squeezed against its end.
     func forecast(
         startingBalance: Decimal,
         transactions: [Transaction],
         payCycles: [PayCycle],
         recurrenceRules: [RecurrenceRule] = [],
         over horizon: ForecastHorizon,
-        historyMonths: Int = 12,
+        historyMonths: Int? = nil,
         from date: Date = .now
     ) -> Forecast {
         let start = self.calendar.startOfDay(for: date)
@@ -175,7 +178,7 @@ struct BalanceForecaster {
         let history = BalanceHistory.points(
             endingAt: startingBalance,
             transactions: transactions,
-            over: historyMonths,
+            over: historyMonths ?? min(horizon.months, 12),
             asOf: date,
             calendar: self.calendar
         )

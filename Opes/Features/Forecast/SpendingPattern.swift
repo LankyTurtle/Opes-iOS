@@ -3,15 +3,17 @@ import Foundation
 /// What the past year says about how money actually moves, so a forecast can
 /// replay it rather than draw a straight line at the average.
 ///
-/// Two parts, because spending has two shapes. Bills and pay repeat on a date and
-/// are projected onto those dates. Everything else — groceries, coffee, a tank of
-/// fuel — is irregular, and is carried forward as a daily average that keeps the
-/// weekday shape it was observed with, so weekends stay heavier than Tuesdays.
+/// Two parts, because money moves in two shapes. Bills and pay repeat on a date
+/// and are projected onto those dates. Everything else — groceries, coffee, a
+/// transfer from savings, a deposit whose reference changes every time — is
+/// irregular, and is carried forward as a daily average that keeps the weekday
+/// shape it was observed with, so weekends stay heavier than Tuesdays. Money in
+/// and money out are averaged alike, so a balance that has held steady projects
+/// steady rather than keeping the spending and losing whatever paid for it.
 ///
-/// Transfers are the known gap: money moved out of one of the user's own accounts
-/// reads as spending, which is right for that account's own forecast but overstates
-/// it across the whole net worth. Categorised transfers can net themselves out once
-/// transactions carry a category.
+/// Transfers between the user's own accounts count as money out of one and money
+/// in to the other, which is right for each account's forecast and cancels out
+/// across the whole net worth.
 struct SpendingPattern: Hashable {
     /// Detected repeats, income and outgoing alike.
     let recurring: [RecurringTransaction]
@@ -22,6 +24,11 @@ struct SpendingPattern: Hashable {
     let irregularOutflowByWeekday: [Int: Decimal]
     /// The same, flattened across all days.
     let irregularDailyOutflow: Decimal
+    /// Average money in per day for everything that isn't recurring or paid by a
+    /// pay cycle, by weekday.
+    let irregularInflowByWeekday: [Int: Decimal]
+    /// The same, flattened across all days.
+    let irregularDailyInflow: Decimal
     let observedDays: Int
     let observedOutflow: Decimal
 
@@ -30,6 +37,8 @@ struct SpendingPattern: Hashable {
         payCycleNames: [:],
         irregularOutflowByWeekday: [:],
         irregularDailyOutflow: 0,
+        irregularInflowByWeekday: [:],
+        irregularDailyInflow: 0,
         observedDays: 0,
         observedOutflow: 0
     )
@@ -44,42 +53,22 @@ struct SpendingPattern: Hashable {
         self.irregularOutflowByWeekday[weekday] ?? self.irregularDailyOutflow
     }
 
-    /// Notes the repeats a pay cycle already accounts for, so pay isn't projected
-    /// once from the schedule the user entered and again from the deposits it left
-    /// behind.
-    ///
-    /// Matched on the linked transaction's summary where the user set one, and on
-    /// the cycle's own name otherwise — which is what someone naming a cycle
-    /// "Salary" would expect. Only a cycle with an amount projects anything, and
-    /// only into its own account when it has one, so only those cover a repeat.
-    func coveringIncome(with payCycles: [PayCycle], in transactions: [Transaction]) -> SpendingPattern {
-        var names: [RecurrenceKey: String] = [:]
-        for cycle in payCycles where cycle.isEnabled && cycle.amount != 0 {
-            let linked = transactions.first { $0.id == cycle.linkedTransactionID }
-            let matches = Set([linked?.summary, cycle.name].compactMap { $0?.lowercased() })
-            for item in self.recurring where item.isIncome && names[item.key] == nil
-                && matches.contains(item.merchant.lowercased())
-                && (cycle.accountID == nil || cycle.accountID == item.key.accountID) {
-                names[item.key] = cycle.name
-            }
-        }
-
-        return SpendingPattern(
-            recurring: self.recurring,
-            payCycleNames: names,
-            irregularOutflowByWeekday: self.irregularOutflowByWeekday,
-            irregularDailyOutflow: self.irregularDailyOutflow,
-            observedDays: self.observedDays,
-            observedOutflow: self.observedOutflow
-        )
+    /// What to add on a given weekday, alongside the dated pay and repeats.
+    func irregularInflow(onWeekday weekday: Int) -> Decimal {
+        self.irregularInflowByWeekday[weekday] ?? self.irregularDailyInflow
     }
 
     /// Averages over the window the transactions themselves cover — from the oldest
     /// one to today — rather than a fixed number of days, so a short history isn't
     /// diluted by days that were never observed.
+    ///
+    /// Money in that a pay cycle with an amount already projects is left out of
+    /// the averages and noted against its repeat, so pay isn't projected once from
+    /// the schedule the user entered and again from the deposits it left behind.
     static func make(
         from transactions: [Transaction],
         rules: [RecurrenceRule] = [],
+        payCycles: [PayCycle] = [],
         asOf date: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) -> SpendingPattern {
@@ -97,32 +86,73 @@ struct SpendingPattern: Hashable {
 
         let recurring = RecurrenceFinder(calendar: calendar).find(in: observed, rules: rules)
         let recurringIDs = Set(recurring.flatMap(\.transactionIDs))
+        let payCycles = self.payingCycles(payCycles, in: transactions)
 
-        let irregularOutflows = observed.filter {
-            $0.amount < 0 && !recurringIDs.contains($0.id)
+        var payCycleNames: [RecurrenceKey: String] = [:]
+        for item in recurring where item.isIncome {
+            if let cycle = payCycles.first(where: { $0.pays(item.merchant, into: item.key.accountID) }) {
+                payCycleNames[item.key] = cycle.name
+            }
+        }
+
+        let irregular = observed.filter { !recurringIDs.contains($0.id) }
+        let irregularOutflows = irregular.filter { $0.amount < 0 }
+        let irregularInflows = irregular.filter { transaction in
+            transaction.amount > 0
+                && !payCycles.contains { $0.pays(transaction.summary, into: transaction.accountID) }
         }
         let totalOutflow = observed.reduce(Decimal.zero) { $0 - min($1.amount, 0) }
-        let irregularTotal = irregularOutflows.reduce(Decimal.zero) { $0 - $1.amount }
 
         return SpendingPattern(
             recurring: recurring,
-            payCycleNames: [:],
-            irregularOutflowByWeekday: self.outflowByWeekday(
-                irregularOutflows,
-                from: firstDay,
-                to: today,
-                calendar: calendar
-            ),
-            irregularDailyOutflow: irregularTotal / Decimal(days),
+            payCycleNames: payCycleNames,
+            irregularOutflowByWeekday: self.byWeekday(irregularOutflows, from: firstDay, to: today, calendar: calendar),
+            irregularDailyOutflow: self.total(of: irregularOutflows) / Decimal(days),
+            irregularInflowByWeekday: self.byWeekday(irregularInflows, from: firstDay, to: today, calendar: calendar),
+            irregularDailyInflow: self.total(of: irregularInflows) / Decimal(days),
             observedDays: days,
             observedOutflow: totalOutflow
         )
     }
 
+    /// A pay cycle that projects money, and the summaries its deposits go by.
+    private struct PayingCycle {
+        let name: String
+        let accountID: AccountPreview.ID?
+        let summaries: Set<String>
+
+        /// Matched on summary, and only into the cycle's own account when it has one.
+        func pays(_ summary: String, into accountID: AccountPreview.ID) -> Bool {
+            self.summaries.contains(summary.lowercased())
+                && (self.accountID == nil || self.accountID == accountID)
+        }
+    }
+
+    /// Only a cycle with an amount projects anything, so only those stand in for
+    /// deposits. Matched on the linked transaction's summary where the user set
+    /// one, and on the cycle's own name otherwise — which is what someone naming a
+    /// cycle "Salary" would expect.
+    private static func payingCycles(_ payCycles: [PayCycle], in transactions: [Transaction]) -> [PayingCycle] {
+        payCycles.filter { $0.isEnabled && $0.amount != 0 }.map { cycle in
+            let linked = transactions.first { $0.id == cycle.linkedTransactionID }
+            return PayingCycle(
+                name: cycle.name,
+                accountID: cycle.accountID,
+                summaries: Set([linked?.summary, cycle.name].compactMap { $0?.lowercased() })
+            )
+        }
+    }
+
+    /// Money moved either way, as a positive amount.
+    private static func total(of transactions: [Transaction]) -> Decimal {
+        transactions.reduce(Decimal.zero) { $0 + abs($1.amount) }
+    }
+
     /// Divides each weekday's total by how many of that weekday the window actually
     /// held, so a window that ends mid-week doesn't understate its last few days.
-    private static func outflowByWeekday(
-        _ outflows: [Transaction],
+    /// Amounts are positive whichever way the money moved.
+    private static func byWeekday(
+        _ transactions: [Transaction],
         from first: Date,
         to last: Date,
         calendar: Calendar
@@ -130,9 +160,9 @@ struct SpendingPattern: Hashable {
         var totals: [Int: Decimal] = [:]
         var counts: [Int: Int] = [:]
 
-        for outflow in outflows {
-            let weekday = calendar.component(.weekday, from: outflow.date)
-            totals[weekday, default: 0] -= outflow.amount
+        for transaction in transactions {
+            let weekday = calendar.component(.weekday, from: transaction.date)
+            totals[weekday, default: 0] += abs(transaction.amount)
         }
 
         var cursor = first

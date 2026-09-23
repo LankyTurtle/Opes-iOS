@@ -103,8 +103,14 @@ expand the rest. Swipe a transaction to remove it, or use **Add Transactions** t
 from the same account that move money the same way. New transactions with the
 same summary join by themselves. **Undo My Changes** returns the repeat to what
 was found. **Not a Repeat** stops projecting it for good, and its transactions
-count as everyday spending. Changes are saved locally as they are made and
-feed every forecast, including Home's.
+count as everyday money in or out. Changes are saved locally as they are made
+and feed every forecast, including Home's.
+
+Everything that isn't a repeat or a pay cycle, money in as well as money out,
+is carried forward as a daily average that keeps its weekday shape, so a
+balance that has held steady projects steady. Transfers count too: out of one
+account and into another, cancelling out across net worth. The forecast's
+**Money in** and **Money out** show the monthly totals behind the line.
 
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a

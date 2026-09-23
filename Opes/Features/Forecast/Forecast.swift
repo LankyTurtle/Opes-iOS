@@ -131,8 +131,8 @@ struct Forecast {
 ///
 /// Repeats found in the history — pay, rent, subscriptions — are placed on the
 /// dates they'll next fall on, and the pay cycles the user entered are credited on
-/// theirs. What's left over, the irregular day-to-day spending, is carried forward
-/// as a daily average that keeps its weekday shape. So the line steps and dips the
+/// theirs. What's left over, the irregular money in and out, is carried forward as
+/// daily averages that keep their weekday shape. So the line steps and dips the
 /// way a statement does instead of sloping at one rate.
 ///
 /// What it deliberately doesn't do: interest, growth, inflation, or any change in
@@ -171,9 +171,9 @@ struct BalanceForecaster {
             return .empty(horizon: horizon, startingBalance: startingBalance)
         }
 
-        let spending = SpendingPattern
-            .make(from: transactions, rules: recurrenceRules, asOf: date, calendar: self.calendar)
-            .coveringIncome(with: payCycles, in: transactions)
+        let spending = SpendingPattern.make(
+            from: transactions, rules: recurrenceRules, payCycles: payCycles, asOf: date, calendar: self.calendar
+        )
 
         let history = BalanceHistory.points(
             endingAt: startingBalance,
@@ -234,17 +234,14 @@ struct BalanceForecaster {
             cursor = self.calendar.startOfDay(for: next)
 
             let dated = scheduled[cursor] ?? []
-            let irregular = spending.irregularOutflow(
-                onWeekday: self.calendar.component(.weekday, from: cursor)
-            )
+            let weekday = self.calendar.component(.weekday, from: cursor)
+            let irregularIn = spending.irregularInflow(onWeekday: weekday)
+            let irregularOut = spending.irregularOutflow(onWeekday: weekday)
 
-            for movement in dated where movement > 0 {
-                income += movement
-            }
-
-            // The irregular average, plus the outgoing half of anything dated.
-            outflow += dated.reduce(irregular) { $0 - min($1, 0) }
-            balance += dated.reduce(Decimal.zero) { $0 + $1 } - irregular
+            // The irregular averages, plus each half of anything dated.
+            income += dated.reduce(irregularIn) { $0 + max($1, 0) }
+            outflow += dated.reduce(irregularOut) { $0 - min($1, 0) }
+            balance += dated.reduce(Decimal.zero) { $0 + $1 } + irregularIn - irregularOut
 
             points.append(ForecastPoint(date: cursor, balance: balance))
         }

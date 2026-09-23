@@ -69,12 +69,12 @@ final class ForecastViewController: UITableViewController {
     private lazy var directionControlView = FormControlView(control: self.directionControl)
 
     private lazy var incomeRow = FormRowCell(
-        title: "Expected income",
+        title: "Money in",
         control: self.incomeLabel,
         stretchesControl: true
     )
     private lazy var spendingRow = FormRowCell(
-        title: "Average spending",
+        title: "Money out",
         control: self.spendingLabel,
         stretchesControl: true
     )
@@ -375,7 +375,7 @@ final class ForecastViewController: UITableViewController {
             }
 
             notes.append(
-                "Everything else is carried forward from \(days) \(days == 1 ? "day" : "days") of transactions, keeping the weekday shape it was spent in."
+                "Everything else in and out, transfers included, is carried forward from \(days) \(days == 1 ? "day" : "days") of transactions, keeping the weekday shape it moved in."
             )
         } else {
             notes.append("No spending recorded yet, so the projection moves on pay alone.")
@@ -384,9 +384,9 @@ final class ForecastViewController: UITableViewController {
         if self.forecast.expectedIncome == 0 {
             switch self.subject {
             case .netWorth:
-                notes.append("No repeating money in was found. Add a pay cycle to include income.")
+                notes.append("No money in was found. Add a pay cycle to include income.")
             case .account:
-                notes.append("No pay cycle is paid into this account and no repeating money in was found, so no income is counted.")
+                notes.append("No pay cycle is paid into this account and no money in was found, so no income is counted.")
             }
         }
 

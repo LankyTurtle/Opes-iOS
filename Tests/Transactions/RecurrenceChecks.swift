@@ -74,6 +74,29 @@ extension TransactionTests {
         try self.expect(sturdy.contains { $0.merchant == "Moved pay" && $0.cadence == .everyMonths(1) },
                         "The latest months decide the rhythm after pay moves from fortnightly to monthly")
 
+        // Money in that isn't a repeat is carried forward like spending, so a balance
+        // that has held steady doesn't project a fall.
+        func banked(_ offsets: [Int], _ amount: Decimal, named: (Int) -> String) -> [Transaction] {
+            offsets.map { Transaction(id: UUID(), description: named($0), date: calendar.date(byAdding: .day, value: $0, to: start)!,
+                                      amount: amount, accountID: self.accountID, customSummary: named($0)) }
+        }
+        let referenced = banked([0, 14, 28, 42], 2000) { "Deposit ref \($0)" }
+        let swept = banked([1, 15, 29, 43], -2000) { "Sweep ref \($0)" }
+        let steady = SpendingPattern.make(from: referenced + swept, asOf: today, calendar: calendar)
+        try self.expect(steady.recurring.isEmpty && abs(steady.irregularDailyInflow * Decimal(steady.observedDays) - 8000) < 0.01,
+                        "Deposits that aren't a repeat count towards the money in average")
+        try self.expect(steady.irregularDailyInflow == steady.irregularDailyOutflow,
+                        "Money in and out averaged alike balance, as money moved between accounts does")
+        let held = forecast(referenced + swept, [])
+        try self.expect(abs(held.expectedIncome - held.expectedOutflow) < 1 && held.expectedIncome > 0,
+                        "A balance that has held steady projects money in to match the money out")
+        let unpaidPay = banked([0, 14], 2300) { _ in "Acme pay" }
+        let paid = SpendingPattern.make(from: unpaidPay, payCycles: [cycle], asOf: today, calendar: calendar)
+        try self.expect(paid.irregularDailyInflow == 0,
+                        "Deposits a pay cycle already projects stay out of the average even when they aren't a repeat")
+        try self.expect(SpendingPattern.make(from: unpaidPay, payCycles: [unpaid], asOf: today, calendar: calendar).irregularDailyInflow > 0,
+                        "Deposits a pay cycle with no amount would cover still count towards the average")
+
         // Years of history, but a 3-month chart looks back 3 months, so today falls
         // in the middle rather than near the end; longer horizons look back a year.
         let old = Transaction(id: UUID(), description: "Old", date: calendar.date(byAdding: .year, value: -3, to: today)!,

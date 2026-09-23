@@ -83,10 +83,14 @@ category or leave them uncategorised. Deleting a bucket with categories asks
 whether to move them to another bucket or delete them too.
 
 Forecasts list **Repeating in** and **Repeating out**: transactions on one
-account that share a summary and direction and land on a steady rhythm. Money
-out must also stay within 20% of its usual amount. Each row shows the summary,
-the next payment date and how often it repeats, and the next amount on the
-right. Tap a row to see why it was found and which transactions it includes.
+account that share a summary and direction and land on a steady rhythm. The
+last six months decide the rhythm, one gap in five may be off it (a late or
+extra payment counts once), and payments on the same day count as one. Most
+money out must also stay within 20% of its usual amount. Each row shows the
+summary, the next payment date and how often it repeats, and the next amount on
+the right. Money in that a pay cycle with an amount already projects into that
+account is still listed, noting the cycle; the forecast counts it from the cycle
+so it isn't counted twice. Tap a row to see why it was found and which transactions it includes.
 From there you can set the amount, how often it repeats, and the next payment
 date yourself, or choose **Use Amount and Dates From Transactions** to go back
 to working them out. **Add Change** sets a future day from which the repeat

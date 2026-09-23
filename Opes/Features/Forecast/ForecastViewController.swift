@@ -39,6 +39,7 @@ final class ForecastViewController: UITableViewController {
     /// The repeats the sections were last built for. The rows only need rebuilding
     /// when the detected set itself changes, not on every horizon tap.
     private var shownRecurring: [RecurringTransaction] = []
+    private var shownPayCycleNames: [RecurrenceKey: String] = [:]
     /// The repeat rows on show, to open the one tapped.
     private var recurringRows: [(cell: UITableViewCell, key: RecurrenceKey)] = []
 
@@ -174,7 +175,9 @@ final class ForecastViewController: UITableViewController {
         self.recurringRows = []
         for (header, isIncome) in [("Repeating in", true), ("Repeating out", false)] {
             let repeats = self.shownRecurring.filter { $0.isIncome == isIncome }.prefix(Self.shownRecurringLimit)
-            let rows = repeats.map { (cell: RecurrenceRows.repeatRow(for: $0), key: $0.key) }
+            let rows = repeats.map { item in
+                (cell: RecurrenceRows.repeatRow(for: item, payCycleName: self.shownPayCycleNames[item.key]), key: item.key)
+            }
             if !rows.isEmpty {
                 self.recurringRows += rows
                 sections.append(ForecastSection(header: header, rows: rows.map(\.cell)))
@@ -252,8 +255,11 @@ final class ForecastViewController: UITableViewController {
 
         // Everything above is a long-lived view holding its own new value. Only the
         // repeats change the shape of the table, and only when the set itself moves.
-        if self.sections.isEmpty || self.shownRecurring != self.forecast.spending.recurring {
-            self.shownRecurring = self.forecast.spending.recurring
+        let spending = self.forecast.spending
+        if self.sections.isEmpty || self.shownRecurring != spending.recurring
+            || self.shownPayCycleNames != spending.payCycleNames {
+            self.shownRecurring = spending.recurring
+            self.shownPayCycleNames = spending.payCycleNames
             self.buildSections()
         } else {
             self.reloadAssumptionsFooter()
@@ -417,6 +423,7 @@ final class ForecastViewController: UITableViewController {
             self.navigationController?.pushViewController(
                 RecurrenceViewController(
                     key: key,
+                    payCycleName: self.shownPayCycleNames[key],
                     accountProvider: self.accountProvider,
                     transactionProvider: self.transactionProvider
                 ),

@@ -39,10 +39,40 @@ extension TransactionTests {
         try self.expect(fortnights > 0 && projected.expectedIncome == 2300 * fortnights,
                         "Repeating money in is projected at its usual amount on each date it falls")
         try self.expect(projected.projectedBalance == 1000 + projected.expectedIncome, "Repeating money in raises the projected balance")
-        let cycle = PayCycle(name: "Acme pay", amount: 0, frequency: .weekly)
-        let covered = forecaster.forecast(startingBalance: 1000, transactions: pay, payCycles: [cycle], over: .threeMonths,
-                                          historyMonths: 1, from: today)
-        try self.expect(covered.expectedIncome == 0, "Money in a pay cycle already covers isn't counted twice")
+        func forecast(_ transactions: [Transaction], _ cycles: [PayCycle]) -> Forecast {
+            forecaster.forecast(startingBalance: 1000, transactions: transactions, payCycles: cycles, over: .threeMonths,
+                                historyMonths: 1, from: today)
+        }
+        let payKey = RecurrenceKey(pay[0])
+        let cycle = PayCycle(name: "Acme pay", amount: 2300, accountID: self.accountID, frequency: .weekly)
+        let covered = forecast(pay, [cycle])
+        try self.expect(covered.expectedIncome == forecast([], [cycle]).expectedIncome,
+                        "Money in a pay cycle already covers isn't counted twice")
+        try self.expect(covered.spending.recurring.contains { $0.key == payKey } && covered.spending.payCycleNames[payKey] == "Acme pay",
+                        "Money in a pay cycle covers is still listed, naming the cycle")
+        let unpaid = PayCycle(name: "Acme pay", amount: 0, frequency: .weekly)
+        try self.expect(forecast(pay, [unpaid]).expectedIncome == projected.expectedIncome,
+                        "A pay cycle with no amount projects nothing, so it doesn't stand in for the deposits")
+        let elsewhere = PayCycle(name: "Acme pay", amount: 2300, accountID: UUID(), frequency: .weekly)
+        try self.expect(forecast(pay, [elsewhere]).spending.payCycleNames.isEmpty,
+                        "A pay cycle paid into another account doesn't stand in for this account's deposits")
+
+        // Sturdier rhythms: a late pay, a pay split in two on one day, and a move from
+        // fortnightly to monthly pay are all still found.
+        func deposits(_ summary: String, _ offsets: [Int], _ amount: Decimal = 2000) -> [Transaction] {
+            offsets.map { Transaction(id: UUID(), description: "\(summary) \($0)", date: calendar.date(byAdding: .day, value: $0, to: start)!,
+                                      amount: amount, accountID: self.accountID, customSummary: summary) }
+        }
+        let late = deposits("Late pay", [0, 14, 28, 47, 56, 70, 84, 98])
+        let split = deposits("Split pay", [0, 14, 28, 42], 1000) + deposits("Split pay", [0, 14, 28, 42], 1500)
+        let moved = deposits("Moved pay", [0, 14, 28, 42, 56, 70]) + deposits("Moved pay", [260, 290, 321, 351, 382, 412, 443])
+        let sturdy = RecurrenceDetector(calendar: calendar).detect(in: late + split + moved)
+        try self.expect(sturdy.contains { $0.merchant == "Late pay" && $0.cadence == .everyDays(14) },
+                        "One late pay among many doesn't hide a fortnightly rhythm")
+        try self.expect(sturdy.contains { $0.merchant == "Split pay" && $0.cadence == .everyDays(14) && $0.amount == 2500 },
+                        "Pay split into two deposits on one day reads as one payday for their total")
+        try self.expect(sturdy.contains { $0.merchant == "Moved pay" && $0.cadence == .everyMonths(1) },
+                        "The latest months decide the rhythm after pay moves from fortnightly to monthly")
 
         // Years of history, but a 3-month chart looks back 3 months, so today falls
         // in the middle rather than near the end; longer horizons look back a year.

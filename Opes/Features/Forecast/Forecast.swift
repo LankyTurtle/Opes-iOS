@@ -173,7 +173,7 @@ struct BalanceForecaster {
 
         let spending = SpendingPattern
             .make(from: transactions, rules: recurrenceRules, asOf: date, calendar: self.calendar)
-            .withoutIncome(coveredBy: payCycles, in: transactions)
+            .coveringIncome(with: payCycles, in: transactions)
 
         let history = BalanceHistory.points(
             endingAt: startingBalance,
@@ -213,7 +213,7 @@ struct BalanceForecaster {
     ) -> (points: [ForecastPoint], income: Decimal, outflow: Decimal) {
         let scheduled = self.scheduledMovements(
             payCycles: payCycles,
-            recurring: spending.recurring,
+            recurring: spending.recurring.filter { spending.payCycleNames[$0.key] == nil },
             from: start,
             to: end
         )

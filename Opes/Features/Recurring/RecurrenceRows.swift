@@ -4,13 +4,17 @@ import UIKit
 /// and the amount against the trailing edge.
 enum RecurrenceRows {
     /// A repeat: when it next lands and how often, and what it next lands for.
+    /// `payCycleName` names the pay cycle the forecast counts it from instead.
     static func repeatRow(
-        for item: RecurringTransaction, showsDisclosure: Bool = true,
+        for item: RecurringTransaction, payCycleName: String? = nil, showsDisclosure: Bool = true,
         now: Date = .now, calendar: Calendar = .autoupdatingCurrent
     ) -> UITableViewCell {
         let next = item.plan.next(after: now, calendar: calendar)
-        let details = next.map { "Next \(self.formatted($0.date, now: now, calendar: calendar)) · \($0.cadence.description)" }
+        var details = next.map { "Next \(self.formatted($0.date, now: now, calendar: calendar)) · \($0.cadence.description)" }
             ?? "No more payments"
+        if let payCycleName {
+            details += "\nForecast from your “\(payCycleName)” pay cycle"
+        }
         return self.row(
             title: item.merchant, details: details,
             amount: (next?.amount ?? item.amount).formatted(.currency(code: "AUD")),

@@ -22,6 +22,8 @@ final class RecurrenceViewController: UITableViewController {
     }
 
     private let key: RecurrenceKey
+    /// The pay cycle the forecast counts this from instead, if any.
+    private let payCycleName: String?
     private let accountProvider: any AccountProviding
     private let transactionProvider: any TransactionProviding
     private let store: RecurrenceStore
@@ -56,11 +58,13 @@ final class RecurrenceViewController: UITableViewController {
 
     init(
         key: RecurrenceKey,
+        payCycleName: String? = nil,
         accountProvider: any AccountProviding = AccountStore.shared,
         transactionProvider: any TransactionProviding = TransactionStore.shared,
         store: RecurrenceStore = .shared
     ) {
         self.key = key
+        self.payCycleName = payCycleName
         self.accountProvider = accountProvider
         self.transactionProvider = transactionProvider
         self.store = store
@@ -120,7 +124,9 @@ final class RecurrenceViewController: UITableViewController {
         let ids = Set(item.transactionIDs)
         self.members = transactions.filter { ids.contains($0.id) }.sorted { $0.date > $1.date }
         self.updateEarlierRow()
-        self.summaryRow = RecurrenceRows.repeatRow(for: item, showsDisclosure: false, calendar: self.calendar)
+        self.summaryRow = RecurrenceRows.repeatRow(
+            for: item, payCycleName: self.payCycleName, showsDisclosure: false, calendar: self.calendar
+        )
 
         let schedule = item.plan.schedule
         self.amountField.text = abs(schedule.amount).formatted(.number.precision(.fractionLength(2)).grouping(.never))
@@ -280,33 +286,39 @@ final class RecurrenceViewController: UITableViewController {
 
     // MARK: - Explanations
 
-    /// Says why this was called a repeat, or that the user has taken it over.
+    /// Says why this was called a repeat, or that the user has taken it over, and
+    /// whether a pay cycle stands in for it in the forecast.
     private var explanation: String? {
         guard let item = self.item else { return nil }
         let evidence = item.evidence
         let noun = item.isIncome ? "deposits" : "payments"
-        if item.isEdited {
-            return item.followsTransactions
-                ? "You’ve changed this repeat. Its amount and dates still come from its \(evidence.count) \(noun): the usual gap and amount, counted on from the most recent."
-                : "You’ve set its amount and dates yourself, so they no longer follow its transactions."
-        }
         var sentences: [String] = []
-        let apart = evidence.gaps.map { gaps in
-            gaps.lowerBound == gaps.upperBound ? "\(gaps.lowerBound) days apart" : "\(gaps.lowerBound) to \(gaps.upperBound) days apart"
-        } ?? "on a steady rhythm"
-        let amounts = evidence.amounts.map { range -> String in
-            let low = min(abs(range.lowerBound), abs(range.upperBound))
-            let high = max(abs(range.lowerBound), abs(range.upperBound))
-            return low == high
-                ? "each for \(Self.currency(low))"
-                : "for \(Self.currency(low)) to \(Self.currency(high)); the middle amount, \(Self.currency(abs(item.amount))), is projected"
-        } ?? ""
-        sentences.append("Found because \(evidence.count) \(noun) on this account are summarised “\(item.merchant)” and landed \(apart), \(amounts).")
-        sentences.append(item.isIncome
-            ? "Money in only has to arrive on a steady rhythm."
-            : "Money out also has to stay within 20% of the usual amount, so a shop visited on a rhythm isn’t mistaken for a bill.")
-        if let last = evidence.last {
-            sentences.append("Its next payment is counted on from the most recent, on \(RecurrenceRows.formatted(last, calendar: self.calendar)).")
+        if item.isEdited {
+            sentences.append(item.followsTransactions
+                ? "You’ve changed this repeat. Its amount and dates still come from its \(evidence.count) \(noun): the usual gap and amount, counted on from the most recent."
+                : "You’ve set its amount and dates yourself, so they no longer follow its transactions.")
+        } else {
+            let apart = evidence.gaps.map { gaps in
+                gaps.lowerBound == gaps.upperBound ? "\(gaps.lowerBound) days apart" : "\(gaps.lowerBound) to \(gaps.upperBound) days apart"
+            } ?? "on a steady rhythm"
+            let amounts = evidence.amounts.map { range -> String in
+                let low = min(abs(range.lowerBound), abs(range.upperBound))
+                let high = max(abs(range.lowerBound), abs(range.upperBound))
+                return low == high
+                    ? "each for \(Self.currency(low))"
+                    : "for \(Self.currency(low)) to \(Self.currency(high)); the middle recent amount, \(Self.currency(abs(item.amount))), is projected"
+            } ?? ""
+            sentences.append("Found because \(evidence.count) \(noun) on this account are summarised “\(item.merchant)” and landed \(apart), \(amounts).")
+            sentences.append("The last 6 months decide the rhythm, and one gap in five may be off it, so a late or extra payment doesn’t hide a repeat.")
+            if !item.isIncome {
+                sentences.append("Most payments also have to be within 20% of the usual amount, so a shop visited on a rhythm isn’t mistaken for a bill.")
+            }
+            if let last = evidence.last {
+                sentences.append("Its next payment is counted on from the most recent, on \(RecurrenceRows.formatted(last, calendar: self.calendar)).")
+            }
+        }
+        if let payCycleName = self.payCycleName {
+            sentences.append("The forecast counts this pay from your “\(payCycleName)” pay cycle instead, so it isn’t counted twice; changes here don’t move the forecast while that cycle has an amount.")
         }
         return sentences.joined(separator: " ")
     }

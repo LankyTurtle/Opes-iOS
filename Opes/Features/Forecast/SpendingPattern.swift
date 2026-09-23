@@ -15,6 +15,9 @@ import Foundation
 struct SpendingPattern: Hashable {
     /// Detected repeats, income and outgoing alike.
     let recurring: [RecurringTransaction]
+    /// Repeating money in that a pay cycle already projects, with the cycle's name.
+    /// Still listed, so the user sees every repeat, but projected from the cycle.
+    let payCycleNames: [RecurrenceKey: String]
     /// Average money out per day for everything that isn't recurring, by weekday.
     let irregularOutflowByWeekday: [Int: Decimal]
     /// The same, flattened across all days.
@@ -24,6 +27,7 @@ struct SpendingPattern: Hashable {
 
     static let none = SpendingPattern(
         recurring: [],
+        payCycleNames: [:],
         irregularOutflowByWeekday: [:],
         irregularDailyOutflow: 0,
         observedDays: 0,
@@ -40,30 +44,29 @@ struct SpendingPattern: Hashable {
         self.irregularOutflowByWeekday[weekday] ?? self.irregularDailyOutflow
     }
 
-    /// Drops repeats that a pay cycle already accounts for, so pay isn't counted
-    /// once from the schedule the user entered and again from the deposit it left
+    /// Notes the repeats a pay cycle already accounts for, so pay isn't projected
+    /// once from the schedule the user entered and again from the deposits it left
     /// behind.
     ///
     /// Matched on the linked transaction's summary where the user set one, and on
     /// the cycle's own name otherwise — which is what someone naming a cycle
-    /// "Salary" would expect.
-    func withoutIncome(coveredBy payCycles: [PayCycle], in transactions: [Transaction]) -> SpendingPattern {
-        let covered = Set(
-            payCycles.lazy
-                .filter(\.isEnabled)
-                .flatMap { cycle -> [String] in
-                    let linked = transactions.first { $0.id == cycle.linkedTransactionID }
-                    return [linked?.summary, cycle.name]
-                        .compactMap { $0?.lowercased() }
-                }
-        )
-
-        guard !covered.isEmpty else {
-            return self
+    /// "Salary" would expect. Only a cycle with an amount projects anything, and
+    /// only into its own account when it has one, so only those cover a repeat.
+    func coveringIncome(with payCycles: [PayCycle], in transactions: [Transaction]) -> SpendingPattern {
+        var names: [RecurrenceKey: String] = [:]
+        for cycle in payCycles where cycle.isEnabled && cycle.amount != 0 {
+            let linked = transactions.first { $0.id == cycle.linkedTransactionID }
+            let matches = Set([linked?.summary, cycle.name].compactMap { $0?.lowercased() })
+            for item in self.recurring where item.isIncome && names[item.key] == nil
+                && matches.contains(item.merchant.lowercased())
+                && (cycle.accountID == nil || cycle.accountID == item.key.accountID) {
+                names[item.key] = cycle.name
+            }
         }
 
         return SpendingPattern(
-            recurring: self.recurring.filter { !$0.isIncome || !covered.contains($0.merchant.lowercased()) },
+            recurring: self.recurring,
+            payCycleNames: names,
             irregularOutflowByWeekday: self.irregularOutflowByWeekday,
             irregularDailyOutflow: self.irregularDailyOutflow,
             observedDays: self.observedDays,
@@ -103,6 +106,7 @@ struct SpendingPattern: Hashable {
 
         return SpendingPattern(
             recurring: recurring,
+            payCycleNames: [:],
             irregularOutflowByWeekday: self.outflowByWeekday(
                 irregularOutflows,
                 from: firstDay,
@@ -166,6 +170,9 @@ struct RecurrenceDetector {
     /// to the average, because a year of history can't confirm it.
     private static let intervalRange = 5...45
     private static let minimumOccurrences = 3
+    /// Only the latest months decide the rhythm and amount, so a pay rise or a
+    /// move from fortnightly to monthly pay reads as the repeat it is now.
+    private static let rhythmMonths = 6
 
     init(calendar: Calendar = .autoupdatingCurrent) {
         self.calendar = calendar
@@ -184,32 +191,46 @@ struct RecurrenceDetector {
     /// from the most recent. For a repeat the user has shaped, where they've
     /// already said which transactions belong.
     func fit(_ group: [Transaction]) -> RecurrenceSchedule? {
-        let days = group.map { self.calendar.startOfDay(for: $0.date) }.sorted()
-        let gaps = zip(days, days.dropFirst()).map { earlier, later in
-            self.calendar.dateComponents([.day], from: earlier, to: later).day ?? 0
-        }
-        guard let interval = Self.median(of: gaps), interval > 0,
-              let amount = Self.median(of: group.map(\.amount)), let last = days.last else {
+        let byDay = self.totalsByDay(group)
+        let days = byDay.keys.sorted()
+        guard let interval = Self.median(of: self.gaps(between: days)), interval > 0,
+              let amount = Self.median(of: Array(byDay.values)), let last = days.last else {
             return nil
         }
         return RecurrenceSchedule(amount: amount, cadence: .fitting(days: interval), anchor: last)
+    }
+
+    /// One amount per day, so pay split into two deposits reads as one payday
+    /// rather than as a gap of no days.
+    private func totalsByDay(_ group: [Transaction]) -> [Date: Decimal] {
+        group.reduce(into: [:]) { totals, transaction in
+            totals[self.calendar.startOfDay(for: transaction.date), default: 0] += transaction.amount
+        }
+    }
+
+    private func gaps(between days: [Date]) -> [Int] {
+        zip(days, days.dropFirst()).map { earlier, later in
+            self.calendar.dateComponents([.day], from: earlier, to: later).day ?? 0
+        }
     }
 
     private func recurrence(
         for key: RecurrenceKey,
         in group: [Transaction]
     ) -> RecurringTransaction? {
-        guard group.count >= Self.minimumOccurrences else {
+        let byDay = self.totalsByDay(group)
+        guard
+            let last = byDay.keys.max(),
+            let since = self.calendar.date(byAdding: .month, value: -Self.rhythmMonths, to: last)
+        else {
+            return nil
+        }
+        let days = byDay.keys.filter { $0 >= since }.sorted()
+        guard days.count >= Self.minimumOccurrences else {
             return nil
         }
 
-        let days = group
-            .map { self.calendar.startOfDay(for: $0.date) }
-            .sorted()
-        let gaps = zip(days, days.dropFirst()).map { earlier, later in
-            self.calendar.dateComponents([.day], from: earlier, to: later).day ?? 0
-        }
-
+        let gaps = self.gaps(between: days)
         guard
             let interval = Self.median(of: gaps),
             Self.intervalRange.contains(interval)
@@ -217,14 +238,15 @@ struct RecurrenceDetector {
             return nil
         }
 
-        // Every gap has to sit near the median. A month is the wide case: 28 to 31
-        // days is regular, and a bill paid a couple of days late still is.
+        // Gaps have to sit near the median. A month is the wide case: 28 to 31 days
+        // is regular, and a bill paid a couple of days late still is. One in five may
+        // stray, so a single late pay or extra deposit doesn't hide a steady rhythm.
         let tolerance = max(3, interval / 4)
-        guard gaps.allSatisfy({ abs($0 - interval) <= tolerance }) else {
+        guard Self.strays(in: gaps, interval: interval, tolerance: tolerance) <= gaps.count / 5 else {
             return nil
         }
 
-        let amounts = group.map(\.amount)
+        let amounts = days.compactMap { byDay[$0] }
         guard let typical = Self.median(of: amounts) else {
             return nil
         }
@@ -232,12 +254,8 @@ struct RecurrenceDetector {
         // Charges have to be recognisably the same amount, or this is just a shop
         // the user visits on a rhythm. Money in arriving on a schedule is already
         // regular — pay with overtime, interest — so only its timing has to hold.
-        let drift = amounts.map { abs($0 - typical) }.max() ?? 0
-        guard key.isIncome || drift <= abs(typical) / 5 else {
-            return nil
-        }
-
-        guard let last = days.last else {
+        let drifting = amounts.filter { abs($0 - typical) > abs(typical) / 5 }.count
+        guard key.isIncome || drifting <= amounts.count / 5 else {
             return nil
         }
 
@@ -252,6 +270,26 @@ struct RecurrenceDetector {
             isEdited: false,
             followsTransactions: true
         )
+    }
+
+    /// Gaps off the rhythm, counting a payment that came late or early as one
+    /// stray rather than the long gap and short gap either side of it, and an extra
+    /// payment as one rather than the two gaps it splits.
+    private static func strays(in gaps: [Int], interval: Int, tolerance: Int) -> Int {
+        var strays = 0
+        var index = 0
+        while index < gaps.count {
+            defer { index += 1 }
+            guard abs(gaps[index] - interval) > tolerance else { continue }
+            strays += 1
+            if index + 1 < gaps.count {
+                let pair = gaps[index] + gaps[index + 1]
+                if abs(pair - 2 * interval) <= tolerance || abs(pair - interval) <= tolerance {
+                    index += 1
+                }
+            }
+        }
+        return strays
     }
 
     private static func median<Value: Comparable>(of values: [Value]) -> Value? {

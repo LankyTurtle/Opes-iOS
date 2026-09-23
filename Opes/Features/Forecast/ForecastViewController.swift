@@ -235,7 +235,11 @@ final class ForecastViewController: UITableViewController {
     private func directionChanged() {
         guard let section = self.sections.firstIndex(where: \.listsRepeats) else { return }
         self.sections[section].rows = self.shownRepeatRows
-        self.tableView.reloadSections(IndexSet(integer: section), with: .automatic)
+        // A cross-fade rather than a row animation: sliding rows would pass
+        // behind the glass control and show through it.
+        UIView.transition(with: self.tableView, duration: 0.2, options: .transitionCrossDissolve) {
+            self.tableView.reloadData()
+        }
     }
 
     private func horizonChanged() {

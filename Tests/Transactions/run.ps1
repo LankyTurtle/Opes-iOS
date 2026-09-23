@@ -23,7 +23,9 @@ $sources = @(
     'Opes/Features/PayCycles/AustralianPublicHolidayProvider.swift',
     'Opes/Features/Forecast/BalanceHistory.swift',
     'Opes/Features/Forecast/Forecast.swift',
-    'Opes/Features/Forecast/SpendingPattern.swift'
+    'Opes/Features/Forecast/SpendingPattern.swift',
+    'Opes/Features/Recurring/Recurrence.swift',
+    'Opes/Features/Recurring/RecurrenceStore.swift'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 try {
     & swiftc -swift-version 5 @sources -o $testBinary

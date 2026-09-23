@@ -1,52 +1,5 @@
 import Foundation
 
-/// A transaction that repeats: the same merchant, at a steady interval. Rent, a
-/// subscription, a gym membership, pay that isn't set up as a pay cycle.
-struct RecurringTransaction: Hashable {
-    enum Cadence: Hashable {
-        /// A steady gap in days — weekly, fortnightly, or anything else regular.
-        case everyDays(Int)
-        /// The same day each month, which is how most bills actually fall.
-        case monthly(day: Int)
-
-        /// Roughly how many times a year it lands, for a monthly average.
-        var occurrencesPerYear: Decimal {
-            switch self {
-            case .everyDays(let interval): Decimal(365) / Decimal(max(interval, 1))
-            case .monthly: 12
-            }
-        }
-
-        var description: String {
-            switch self {
-            case .everyDays(let interval):
-                switch interval {
-                case 7: "weekly"
-                case 14: "fortnightly"
-                default: "every \(interval) days"
-                }
-            case .monthly: "monthly"
-            }
-        }
-    }
-
-    /// The transactions' summary, which is how the user sees them everywhere else.
-    let merchant: String
-    /// Signed the way it appears on the account: negative for money out.
-    let amount: Decimal
-    let cadence: Cadence
-    let lastOccurrence: Date
-    let occurrences: Int
-
-    var isIncome: Bool {
-        self.amount > 0
-    }
-
-    var monthlyAmount: Decimal {
-        self.amount * self.cadence.occurrencesPerYear / 12
-    }
-}
-
 /// What the past year says about how money actually moves, so a forecast can
 /// replay it rather than draw a straight line at the average.
 ///
@@ -123,6 +76,7 @@ struct SpendingPattern: Hashable {
     /// diluted by days that were never observed.
     static func make(
         from transactions: [Transaction],
+        rules: [RecurrenceRule] = [],
         asOf date: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) -> SpendingPattern {
@@ -138,11 +92,11 @@ struct SpendingPattern: Hashable {
         // The oldest day is one observed day, not zero.
         let days = max(elapsed + 1, 1)
 
-        let recurring = RecurrenceDetector(calendar: calendar).detect(in: observed)
-        let recurringOutflows = Set(recurring.lazy.filter { !$0.isIncome }.map(\.merchant))
+        let recurring = RecurrenceFinder(calendar: calendar).find(in: observed, rules: rules)
+        let recurringIDs = Set(recurring.flatMap(\.transactionIDs))
 
         let irregularOutflows = observed.filter {
-            $0.amount < 0 && !recurringOutflows.contains($0.summary)
+            $0.amount < 0 && !recurringIDs.contains($0.id)
         }
         let totalOutflow = observed.reduce(Decimal.zero) { $0 - min($1.amount, 0) }
         let irregularTotal = irregularOutflows.reduce(Decimal.zero) { $0 - $1.amount }
@@ -218,22 +172,32 @@ struct RecurrenceDetector {
     }
 
     func detect(in transactions: [Transaction]) -> [RecurringTransaction] {
-        Dictionary(grouping: transactions.filter { $0.amount != 0 }) { MerchantKey(summary: $0.summary, isIncome: $0.amount > 0) }
+        Dictionary(grouping: transactions.filter { $0.amount != 0 }, by: RecurrenceKey.init)
             .compactMap { key, group in
-                self.recurrence(for: key.summary, in: group, isIncome: key.isIncome)
+                self.recurrence(for: key, in: group)
             }
             .sorted { abs($0.monthlyAmount) > abs($1.monthlyAmount) }
     }
 
-    private struct MerchantKey: Hashable {
-        let summary: String
-        let isIncome: Bool
+    /// The terms a set of transactions points to, without asking whether they're
+    /// regular enough to be called a repeat: the typical gap and amount, stepping
+    /// from the most recent. For a repeat the user has shaped, where they've
+    /// already said which transactions belong.
+    func fit(_ group: [Transaction]) -> RecurrenceSchedule? {
+        let days = group.map { self.calendar.startOfDay(for: $0.date) }.sorted()
+        let gaps = zip(days, days.dropFirst()).map { earlier, later in
+            self.calendar.dateComponents([.day], from: earlier, to: later).day ?? 0
+        }
+        guard let interval = Self.median(of: gaps), interval > 0,
+              let amount = Self.median(of: group.map(\.amount)), let last = days.last else {
+            return nil
+        }
+        return RecurrenceSchedule(amount: amount, cadence: .fitting(days: interval), anchor: last)
     }
 
     private func recurrence(
-        for merchant: String,
-        in group: [Transaction],
-        isIncome: Bool
+        for key: RecurrenceKey,
+        in group: [Transaction]
     ) -> RecurringTransaction? {
         guard group.count >= Self.minimumOccurrences else {
             return nil
@@ -269,7 +233,7 @@ struct RecurrenceDetector {
         // the user visits on a rhythm. Money in arriving on a schedule is already
         // regular — pay with overtime, interest — so only its timing has to hold.
         let drift = amounts.map { abs($0 - typical) }.max() ?? 0
-        guard isIncome || drift <= abs(typical) / 5 else {
+        guard key.isIncome || drift <= abs(typical) / 5 else {
             return nil
         }
 
@@ -277,14 +241,16 @@ struct RecurrenceDetector {
             return nil
         }
 
+        let members = group.sorted { $0.date < $1.date }
         return RecurringTransaction(
-            merchant: merchant,
-            amount: typical,
-            cadence: interval >= 26
-                ? .monthly(day: self.calendar.component(.day, from: last))
-                : .everyDays(interval),
-            lastOccurrence: last,
-            occurrences: group.count
+            key: key,
+            plan: RecurrencePlan(schedule: RecurrenceSchedule(
+                amount: typical, cadence: .fitting(days: interval), anchor: last
+            )),
+            transactionIDs: members.map(\.id),
+            evidence: RecurrenceEvidence(members, calendar: self.calendar),
+            isEdited: false,
+            followsTransactions: true
         )
     }
 

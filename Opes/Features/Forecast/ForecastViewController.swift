@@ -39,6 +39,8 @@ final class ForecastViewController: UITableViewController {
     /// The repeats the sections were last built for. The rows only need rebuilding
     /// when the detected set itself changes, not on every horizon tap.
     private var shownRecurring: [RecurringTransaction] = []
+    /// The repeat rows on show, to open the one tapped.
+    private var recurringRows: [(cell: UITableViewCell, key: RecurrenceKey)] = []
 
     private let summaryView = ForecastSummaryView()
     private let chartView = ForecastChartView()
@@ -169,10 +171,13 @@ final class ForecastViewController: UITableViewController {
 
         // Split by direction, so a few large bills can't crowd out the pay and
         // transfers coming in.
+        self.recurringRows = []
         for (header, isIncome) in [("Repeating in", true), ("Repeating out", false)] {
             let repeats = self.shownRecurring.filter { $0.isIncome == isIncome }.prefix(Self.shownRecurringLimit)
-            if !repeats.isEmpty {
-                sections.append(ForecastSection(header: header, rows: repeats.map(Self.makeRecurringRow)))
+            let rows = repeats.map { (cell: RecurrenceRows.repeatRow(for: $0), key: $0.key) }
+            if !rows.isEmpty {
+                self.recurringRows += rows
+                sections.append(ForecastSection(header: header, rows: rows.map(\.cell)))
             }
         }
 
@@ -200,6 +205,7 @@ final class ForecastViewController: UITableViewController {
         let startingBalance: Decimal
         let subjectTransactions: [Transaction]
         let payCycles: [PayCycle]
+        let recurrenceRules: [RecurrenceRule]
 
         switch self.subject {
         case .netWorth:
@@ -207,6 +213,9 @@ final class ForecastViewController: UITableViewController {
                 .reduce(Decimal.zero) { $0 + $1.balance }
             subjectTransactions = transactions
             payCycles = cycles
+            recurrenceRules = RecurrenceStore.shared.rules(
+                forAccounts: Set(self.accountProvider.accounts().map(\.id))
+            )
 
         case .account(let account):
             startingBalance = account.balance
@@ -214,12 +223,14 @@ final class ForecastViewController: UITableViewController {
             // Only the pay the user has told us lands here. A cycle with no account
             // set feeds the net worth forecast but no single account's.
             payCycles = cycles.filter { $0.accountID == account.id }
+            recurrenceRules = RecurrenceStore.shared.rules(forAccounts: [account.id])
         }
 
         self.forecast = self.forecaster.forecast(
             startingBalance: startingBalance,
             transactions: subjectTransactions,
             payCycles: payCycles,
+            recurrenceRules: recurrenceRules,
             over: self.horizon
         )
 
@@ -247,23 +258,6 @@ final class ForecastViewController: UITableViewController {
         } else {
             self.reloadAssumptionsFooter()
         }
-    }
-
-    /// One detected repeat: what it is, and what it does to the balance each time.
-    /// The amount sits under the summary, so a long summary can't push it off the row.
-    private static func makeRecurringRow(for item: RecurringTransaction) -> UITableViewCell {
-        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
-        cell.selectionStyle = .none
-
-        var content = UIListContentConfiguration.subtitleCell()
-        content.text = item.merchant
-        content.textProperties.numberOfLines = 1
-        content.textProperties.lineBreakMode = .byTruncatingTail
-        content.secondaryText = "\(ForecastFormatter.currency(item.amount)) · \(item.cadence.description)"
-        content.secondaryTextProperties.color = .secondaryLabel
-        cell.contentConfiguration = content
-
-        return cell
     }
 
     /// The footer is the only part that isn't a long-lived view, so it is the only
@@ -416,6 +410,18 @@ final class ForecastViewController: UITableViewController {
         if row === self.numberRow, case .account(let account) = self.subject, !account.type.hasBSB {
             self.isNumberRevealed.toggle()
             self.updateNumberLabel()
+            return
+        }
+
+        if let key = self.recurringRows.first(where: { $0.cell === row })?.key {
+            self.navigationController?.pushViewController(
+                RecurrenceViewController(
+                    key: key,
+                    accountProvider: self.accountProvider,
+                    transactionProvider: self.transactionProvider
+                ),
+                animated: true
+            )
             return
         }
 

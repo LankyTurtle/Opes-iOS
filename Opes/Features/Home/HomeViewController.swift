@@ -248,6 +248,7 @@ final class HomeViewController: TabRootViewController {
                 startingBalance: self.accounts.reduce(Decimal.zero) { $0 + $1.balance },
                 transactions: self.transactionProvider.transactions(),
                 payCycles: self.payCycleStore.load(),
+                recurrenceRules: RecurrenceStore.shared.rules(forAccounts: Set(self.accounts.map(\.id))),
                 over: .default
             ),
             accountCount: self.accounts.count

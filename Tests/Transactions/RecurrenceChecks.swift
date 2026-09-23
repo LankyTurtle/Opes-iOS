@@ -47,4 +47,102 @@ extension TransactionTests {
         let pattern = SpendingPattern.make(from: rent + shop, asOf: calendar.date(byAdding: .day, value: 21, to: start)!, calendar: calendar)
         try self.expect(pattern.irregularDailyOutflow * Decimal(pattern.observedDays) == 77, "Repeats leave the irregular average; the rest stays in it")
     }
+
+    static func recurrenceRuleChecks() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Australia/Sydney")!
+        func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
+            calendar.date(from: DateComponents(year: year, month: month, day: day))!
+        }
+        func days(_ offset: Int, from date: Date) -> Date { calendar.date(byAdding: .day, value: offset, to: date)! }
+
+        let monthly = RecurrenceSchedule(amount: -90, cadence: .everyMonths(1), anchor: day(2026, 1, 31))
+        try self.expect(monthly.dates(after: day(2026, 1, 31), through: day(2026, 5, 1), calendar: calendar)
+                            == [day(2026, 2, 28), day(2026, 3, 31), day(2026, 4, 30)],
+                        "Monthly repeats land on the anchor's day, or a short month's last day")
+        try self.expect(monthly.dates(after: day(2025, 10, 1), through: day(2025, 12, 1), calendar: calendar)
+                            == [day(2025, 10, 31), day(2025, 11, 30)],
+                        "A schedule steps back from its anchor as well as forward")
+
+        // Rent of $1,700 a fortnight becomes $1,800 a week from 27 April, then stops on 25 May.
+        let start = day(2026, 3, 2)
+        let rise = RecurrenceChange(id: UUID(), date: days(56, from: start),
+                                    terms: RecurrenceChange.Terms(amount: -1800, cadence: .everyDays(7)))
+        let stop = RecurrenceChange(id: UUID(), date: days(84, from: start), terms: nil)
+        let plan = RecurrencePlan(schedule: RecurrenceSchedule(amount: -1700, cadence: .everyDays(14), anchor: start),
+                                  changes: [stop, rise])
+        let planned = plan.occurrences(after: start, through: days(120, from: start), calendar: calendar)
+        try self.expect(planned.map(\.date) == [14, 28, 42, 56, 63, 70, 77].map { days($0, from: start) },
+                        "A change takes over from its first payment and a stop ends the repeat")
+        try self.expect(planned.map(\.amount) == [-1700, -1700, -1700, -1800, -1800, -1800, -1800],
+                        "Each payment carries the amount in force on its day")
+        try self.expect(plan.next(after: days(50, from: start), calendar: calendar)?.date == days(56, from: start)
+                            && plan.next(after: days(80, from: start), calendar: calendar) == nil,
+                        "The next payment follows the changes, and there is none once stopped")
+        try self.expect(plan.terms(on: days(60, from: start), calendar: calendar)?.cadence == .everyDays(7)
+                            && plan.terms(on: days(90, from: start), calendar: calendar) == nil,
+                        "The terms in force follow the changes")
+
+        let accountID = UUID()
+        func transaction(_ summary: String, _ offset: Int, _ amount: Decimal) -> Transaction {
+            Transaction(id: UUID(), description: "\(summary) ref \(offset)", date: days(offset, from: start),
+                        amount: amount, accountID: accountID, customSummary: summary)
+        }
+        let rent = [0, 14, 28, 42].map { transaction("Rent", $0, -1700) }
+        let bond = transaction("Rent", 30, -3400)
+        let cash = transaction("Cash to landlord", 56, -1700)
+        let key = RecurrenceKey(rent[0])
+        let finder = RecurrenceFinder(calendar: calendar)
+        let found = finder.find(in: rent, rules: [])
+        try self.expect(found.first?.key == key && found.first?.isEdited == false, "Untouched repeats are found from the history")
+
+        var rule = RecurrenceRule(key: key, schedule: found[0].plan.schedule)
+            .removing(bond).adding([cash.id])
+        try rule = rule.settingChange(rise, calendar: calendar)
+        try self.rejects("Two changes can't share a day") {
+            _ = try rule.settingChange(RecurrenceChange(id: UUID(), date: rise.date, terms: nil), calendar: calendar)
+        }
+        let later = transaction("Rent", 70, -1700)
+        let shaped = finder.find(in: rent + [bond, cash, later], rules: [rule])
+        try self.expect(shaped.count == 1 && Set(shaped[0].transactionIDs) == Set((rent + [cash, later]).map(\.id)),
+                        "A rule keeps what the user added, leaves out what they removed, and takes in new matches")
+        try self.expect(shaped[0].isEdited && shaped[0].plan.schedule.anchor == days(70, from: start)
+                            && shaped[0].plan.changes == [rise],
+                        "A rule that follows its transactions steps from the newest, with the user's changes")
+        let pattern = SpendingPattern.make(from: rent + [bond, cash], rules: [rule], asOf: days(60, from: start), calendar: calendar)
+        try self.expect(abs(pattern.irregularDailyOutflow * Decimal(pattern.observedDays) - 3400) < 0.01,
+                        "A transaction taken out of a repeat counts as everyday spending again")
+
+        var fixed = rule
+        fixed.followsTransactions = false
+        fixed.schedule = RecurrenceSchedule(amount: -1650, cadence: .everyMonths(1), anchor: days(90, from: start))
+        try self.expect(finder.find(in: rent, rules: [fixed]).first?.plan.schedule == fixed.schedule,
+                        "Terms the user set stay as they set them")
+
+        var dismissed = rule
+        dismissed.isDismissed = true
+        let quiet = SpendingPattern.make(from: rent, rules: [dismissed], asOf: days(60, from: start), calendar: calendar)
+        try self.expect(quiet.recurring.isEmpty && abs(quiet.irregularDailyOutflow * Decimal(quiet.observedDays) - 6800) < 0.01,
+                        "A repeat the user says isn't one is neither projected nor found again")
+
+        let forecast = BalanceForecaster(calendar: calendar).forecast(
+            startingBalance: 10_000, transactions: rent, payCycles: [], recurrenceRules: [rule],
+            over: .threeMonths, historyMonths: 1, from: days(43, from: start)
+        )
+        // From 14 April to 14 July: the change's weekly $1,800 from 27 April, 12 times.
+        try self.expect(forecast.expectedOutflow == 1800 * 12, "The forecast projects a rule's changes: \(forecast.expectedOutflow)")
+
+        let suite = "recurrence-store-checks-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = RecurrenceStore(defaults: defaults)
+        try self.expect(store.rule(for: found[0]) == RecurrenceRule(key: key, schedule: found[0].plan.schedule),
+                        "An untouched repeat starts a rule from what was found")
+        store.save(rule)
+        store.save(fixed)
+        try self.expect(store.rules() == [fixed] && store.rule(for: found[0]) == fixed, "One rule is saved per repeat")
+        try self.expect(store.rules(forAccounts: [UUID()]).isEmpty, "Rules for other accounts are left out")
+        store.delete(key)
+        try self.expect(store.rules().isEmpty, "Forgetting a rule finds the repeat afresh")
+    }
 }

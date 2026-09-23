@@ -82,6 +82,23 @@ category that is in use asks whether to move its transactions to another
 category or leave them uncategorised. Deleting a bucket with categories asks
 whether to move them to another bucket or delete them too.
 
+Forecasts list **Repeating in** and **Repeating out**: transactions on one
+account that share a summary and direction and land on a steady rhythm. Money
+out must also stay within 20% of its usual amount. Each row shows the summary,
+the next payment date and how often it repeats, and the next amount on the
+right. Tap a row to see why it was found and which transactions it includes.
+From there you can set the amount, how often it repeats, and the next payment
+date yourself, or choose **Use Amount and Dates From Transactions** to go back
+to working them out. **Add Change** sets a future day from which the repeat
+stops, or lands for a different amount, on a different rhythm, or from a
+different pay day. You can have several changes, but not two on the same day.
+Swipe a transaction to remove it, or use **Add Transactions** to pick others
+from the same account that move money the same way. New transactions with the
+same summary join by themselves. **Undo My Changes** returns the repeat to what
+was found. **Not a Repeat** stops projecting it for good, and its transactions
+count as everyday spending. Changes are saved locally as they are made and
+feed every forecast, including Home's.
+
 For CSVs, select an account and choose a file from the device's Files picker.
 Both transaction forms offer **Add New Account…** in the account menu. Enter a
 name, type, institution, and number to save an account locally and select it
@@ -132,7 +149,9 @@ need to be entered again.
 
 Run `./Tests/Transactions/run.ps1` with PowerShell and Swift installed. These
 checks compile the production Foundation model, amount validation, CSV reader,
-parser, account persistence, transaction store, and repeat detection. A small account-preview stand-in removes the UIKit dependency;
+parser, account persistence, transaction store, repeat detection, and repeat
+rules (schedules, future changes, added and removed transactions, and their
+effect on forecasts). A small account-preview stand-in removes the UIKit dependency;
 Windows also stubs security-scoped URL access, which must be checked on iOS.
 Build in Xcode and verify the menu, both forms, Files picker cancellation,
 Upload/preview/import flow, Dynamic Type, and VoiceOver on a device or simulator.

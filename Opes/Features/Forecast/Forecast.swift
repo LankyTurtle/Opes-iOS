@@ -150,12 +150,14 @@ struct BalanceForecaster {
 
     /// Builds the whole line — history then projection — for one position.
     ///
-    /// `transactions` and `payCycles` are expected to be narrowed to the position
-    /// already: one account's, or every account's for a net worth.
+    /// `transactions`, `payCycles`, and `recurrenceRules` are expected to be
+    /// narrowed to the position already: one account's, or every account's for a
+    /// net worth.
     func forecast(
         startingBalance: Decimal,
         transactions: [Transaction],
         payCycles: [PayCycle],
+        recurrenceRules: [RecurrenceRule] = [],
         over horizon: ForecastHorizon,
         historyMonths: Int = 12,
         from date: Date = .now
@@ -167,7 +169,7 @@ struct BalanceForecaster {
         }
 
         let spending = SpendingPattern
-            .make(from: transactions, asOf: date, calendar: self.calendar)
+            .make(from: transactions, rules: recurrenceRules, asOf: date, calendar: self.calendar)
             .withoutIncome(coveredBy: payCycles, in: transactions)
 
         let history = BalanceHistory.points(
@@ -264,70 +266,11 @@ struct BalanceForecaster {
         }
 
         for item in recurring {
-            for date in self.occurrences(of: item, after: start, through: end) {
-                movements[date, default: []].append(item.amount)
+            for occurrence in item.plan.occurrences(after: start, through: end, calendar: self.calendar) {
+                movements[occurrence.date, default: []].append(occurrence.amount)
             }
         }
 
         return movements
-    }
-
-    /// When a detected repeat next lands, projected from where it last did.
-    private func occurrences(
-        of item: RecurringTransaction,
-        after start: Date,
-        through end: Date
-    ) -> [Date] {
-        var dates: [Date] = []
-
-        switch item.cadence {
-        case .everyDays(let interval):
-            var cursor = self.calendar.startOfDay(for: item.lastOccurrence)
-
-            // A repeat last seen months ago still steps forward on its own interval
-            // rather than restarting today.
-            while cursor <= end {
-                if cursor > start {
-                    dates.append(cursor)
-                }
-
-                guard
-                    let next = self.calendar.date(byAdding: .day, value: interval, to: cursor)
-                else {
-                    break
-                }
-
-                cursor = self.calendar.startOfDay(for: next)
-            }
-
-        case .monthly(let day):
-            let months = self.calendar.dateComponents([.month], from: start, to: end).month ?? 0
-
-            for offset in 0...(months + 1) {
-                guard
-                    let month = self.calendar.date(byAdding: .month, value: offset, to: start),
-                    let length = self.calendar.range(of: .day, in: .month, for: month)?.count
-                else {
-                    continue
-                }
-
-                var components = self.calendar.dateComponents([.year, .month], from: month)
-                components.day = min(day, length)
-
-                guard
-                    let occurrence = self.calendar.date(from: components).map(
-                        self.calendar.startOfDay(for:)
-                    ),
-                    occurrence > start,
-                    occurrence <= end
-                else {
-                    continue
-                }
-
-                dates.append(occurrence)
-            }
-        }
-
-        return dates
     }
 }

@@ -143,76 +143,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          # The date, then the time of day, both in Sydney: always higher than the
+          # build before, with no need to ask App Store Connect. Asking isn't safe,
+          # because a build uploaded moments ago isn't listed while it processes.
+          # 10# drops the leading zero from morning times, so 09:05:12 is 90512.
           build_date=$(TZ=Australia/Sydney date +%Y%m%d)
-          api_key_path="${HOME}/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          build_time=$(TZ=Australia/Sydney date +%H%M%S)
 
-          jwt=$(python3 - "${api_key_path}" "${APP_STORE_CONNECT_KEY_ID}" "${APP_STORE_CONNECT_ISSUER_ID}" <<'PY'
-          import base64
-          import json
-          import subprocess
-          import sys
-          import time
-
-          key_path, key_id, issuer_id = sys.argv[1:]
-
-          def encode(value):
-              return base64.urlsafe_b64encode(value).rstrip(b"=")
-
-          header = encode(json.dumps({"alg": "ES256", "kid": key_id, "typ": "JWT"}, separators=(",", ":")).encode())
-          payload = encode(json.dumps({"iss": issuer_id, "aud": "appstoreconnect-v1", "exp": int(time.time()) + 1_000}, separators=(",", ":")).encode())
-          signing_input = header + b"." + payload
-          der_signature = subprocess.run(
-              ["openssl", "dgst", "-sha256", "-sign", key_path],
-              input=signing_input,
-              check=True,
-              capture_output=True,
-          ).stdout
-
-          # Convert OpenSSL's ASN.1 DER ECDSA signature to the raw r || s form
-          # required by an ES256 JWT.
-          if der_signature[0] != 0x30:
-              raise ValueError("Unexpected ECDSA signature format")
-          offset = 2 + (der_signature[1] & 0x7f if der_signature[1] & 0x80 else 0)
-          values = []
-          for _ in range(2):
-              if der_signature[offset] != 0x02:
-                  raise ValueError("Unexpected ECDSA signature integer")
-              length = der_signature[offset + 1]
-              offset += 2
-              values.append(der_signature[offset:offset + length].lstrip(b"\0").rjust(32, b"\0"))
-              offset += length
-
-          print((signing_input + b"." + encode(b"".join(values))).decode())
-          PY
-          )
-
-          app_response=$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${jwt}" \
-            --get "https://api.appstoreconnect.apple.com/v1/apps" \
-            --data-urlencode "filter[bundleId]=${APP_BUNDLE_ID}" \
-            --data-urlencode "limit=1")
-          app_id=$(jq --raw-output '.data[0].id // empty' <<<"${app_response}")
-          if [[ -z "${app_id}" ]]; then
-            echo "App Store Connect app not found for ${APP_BUNDLE_ID}." >&2
-            exit 1
-          fi
-
-          builds_response=$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${jwt}" \
-            --get "https://api.appstoreconnect.apple.com/v1/builds" \
-            --data-urlencode "filter[app]=${app_id}" \
-            --data-urlencode "fields[builds]=version" \
-            --data-urlencode "sort=-uploadedDate" \
-            --data-urlencode "limit=200")
-          last_increment=$(jq --raw-output --arg prefix "${build_date}." '
-            [.data[].attributes.version
-             | select(startswith($prefix))
-             | split(".")[1]
-             | tonumber]
-            | max // 0
-          ' <<<"${builds_response}")
-
-          build_number="${build_date}.$((last_increment + 1))"
+          build_number="${build_date}.$((10#${build_time}))"
           echo "BUILD_NUMBER=${build_number}" >> "${GITHUB_ENV}"
           echo "Using build number ${build_number}."
 
@@ -318,7 +256,7 @@ jobs:
             echo ""
             echo "- App Store Connect app: ${APP_STORE_APP_ID}"
             echo "- Bundle ID: ${APP_BUNDLE_ID}"
-            echo "- Build number: ${GITHUB_RUN_NUMBER}"
+            echo "- Build number: ${BUILD_NUMBER}"
             echo ""
             echo "Apple will process the build before it becomes available to testers."
           } >> "${GITHUB_STEP_SUMMARY}"

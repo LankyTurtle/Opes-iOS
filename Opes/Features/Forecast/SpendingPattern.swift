@@ -30,6 +30,7 @@ struct RecurringTransaction: Hashable {
         }
     }
 
+    /// The transactions' summary, which is how the user sees them everywhere else.
     let merchant: String
     /// Signed the way it appears on the account: negative for money out.
     let amount: Decimal
@@ -90,7 +91,7 @@ struct SpendingPattern: Hashable {
     /// once from the schedule the user entered and again from the deposit it left
     /// behind.
     ///
-    /// Matched on the linked transaction's description where the user set one, and on
+    /// Matched on the linked transaction's summary where the user set one, and on
     /// the cycle's own name otherwise — which is what someone naming a cycle
     /// "Salary" would expect.
     func withoutIncome(coveredBy payCycles: [PayCycle], in transactions: [Transaction]) -> SpendingPattern {
@@ -99,7 +100,7 @@ struct SpendingPattern: Hashable {
                 .filter(\.isEnabled)
                 .flatMap { cycle -> [String] in
                     let linked = transactions.first { $0.id == cycle.linkedTransactionID }
-                    return [linked?.description, cycle.name]
+                    return [linked?.summary, cycle.name]
                         .compactMap { $0?.lowercased() }
                 }
         )
@@ -138,10 +139,10 @@ struct SpendingPattern: Hashable {
         let days = max(elapsed + 1, 1)
 
         let recurring = RecurrenceDetector(calendar: calendar).detect(in: observed)
-        let recurringMerchants = Set(recurring.map(\.merchant))
+        let recurringOutflows = Set(recurring.lazy.filter { !$0.isIncome }.map(\.merchant))
 
         let irregularOutflows = observed.filter {
-            $0.amount < 0 && !recurringMerchants.contains($0.description)
+            $0.amount < 0 && !recurringOutflows.contains($0.summary)
         }
         let totalOutflow = observed.reduce(Decimal.zero) { $0 - min($1.amount, 0) }
         let irregularTotal = irregularOutflows.reduce(Decimal.zero) { $0 - $1.amount }
@@ -196,6 +197,9 @@ struct SpendingPattern: Hashable {
 
 /// Finds merchants whose transactions arrive at a steady interval.
 ///
+/// Money in and money out are looked at separately, even under the same name, so a
+/// transfer that goes both ways doesn't hide either direction.
+///
 /// Deliberately conservative: three occurrences at a consistent gap before
 /// anything is called recurring, so a fortnight of groceries at the same shop
 /// isn't projected forward as a subscription. Whatever it misses still counts
@@ -214,16 +218,22 @@ struct RecurrenceDetector {
     }
 
     func detect(in transactions: [Transaction]) -> [RecurringTransaction] {
-        Dictionary(grouping: transactions, by: \.description)
-            .compactMap { merchant, group in
-                self.recurrence(for: merchant, in: group)
+        Dictionary(grouping: transactions.filter { $0.amount != 0 }) { MerchantKey(summary: $0.summary, isIncome: $0.amount > 0) }
+            .compactMap { key, group in
+                self.recurrence(for: key.summary, in: group, isIncome: key.isIncome)
             }
             .sorted { abs($0.monthlyAmount) > abs($1.monthlyAmount) }
     }
 
+    private struct MerchantKey: Hashable {
+        let summary: String
+        let isIncome: Bool
+    }
+
     private func recurrence(
         for merchant: String,
-        in group: [Transaction]
+        in group: [Transaction],
+        isIncome: Bool
     ) -> RecurringTransaction? {
         guard group.count >= Self.minimumOccurrences else {
             return nil
@@ -250,15 +260,16 @@ struct RecurrenceDetector {
             return nil
         }
 
-        // Amounts have to be recognisably the same charge, or this is just a shop
-        // the user visits on a rhythm.
         let amounts = group.map(\.amount)
-        guard let typical = Self.median(of: amounts), typical != 0 else {
+        guard let typical = Self.median(of: amounts) else {
             return nil
         }
 
+        // Charges have to be recognisably the same amount, or this is just a shop
+        // the user visits on a rhythm. Money in arriving on a schedule is already
+        // regular — pay with overtime, interest — so only its timing has to hold.
         let drift = amounts.map { abs($0 - typical) }.max() ?? 0
-        guard drift <= abs(typical) / 5 else {
+        guard isIncome || drift <= abs(typical) / 5 else {
             return nil
         }
 

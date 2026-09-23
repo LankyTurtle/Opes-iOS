@@ -5,6 +5,7 @@ $sources = @(
     'Tests/Transactions/Support.swift',
     'Tests/Transactions/TransactionTests.swift',
     'Tests/Transactions/CategoryChecks.swift',
+    'Tests/Transactions/RecurrenceChecks.swift',
     'Opes/Features/Accounts/Account.swift',
     'Opes/Features/Accounts/AccountStore.swift',
     'Opes/Features/Accounts/AccountFilter.swift',
@@ -16,7 +17,9 @@ $sources = @(
     'Opes/Features/Transactions/TransactionAmount.swift',
     'Opes/Features/Transactions/TransactionStore.swift',
     'Opes/Features/Transactions/TransactionCSVAttachment.swift',
-    'Opes/Features/Transactions/TransactionCSVParser.swift'
+    'Opes/Features/Transactions/TransactionCSVParser.swift',
+    'Opes/Features/PayCycles/PayCycle.swift',
+    'Opes/Features/Forecast/SpendingPattern.swift'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 try {
     & swiftc -swift-version 5 @sources -o $testBinary

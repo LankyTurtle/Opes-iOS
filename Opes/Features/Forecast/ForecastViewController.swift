@@ -167,11 +167,13 @@ final class ForecastViewController: UITableViewController {
             ),
         ]
 
-        let repeats = self.shownRecurring.prefix(Self.shownRecurringLimit)
-        if !repeats.isEmpty {
-            sections.append(
-                ForecastSection(header: "Repeating", rows: repeats.map(Self.makeRecurringRow))
-            )
+        // Split by direction, so a few large bills can't crowd out the pay and
+        // transfers coming in.
+        for (header, isIncome) in [("Repeating in", true), ("Repeating out", false)] {
+            let repeats = self.shownRecurring.filter { $0.isIncome == isIncome }.prefix(Self.shownRecurringLimit)
+            if !repeats.isEmpty {
+                sections.append(ForecastSection(header: header, rows: repeats.map(Self.makeRecurringRow)))
+            }
         }
 
         if case .netWorth = self.subject {
@@ -248,11 +250,20 @@ final class ForecastViewController: UITableViewController {
     }
 
     /// One detected repeat: what it is, and what it does to the balance each time.
+    /// The amount sits under the summary, so a long summary can't push it off the row.
     private static func makeRecurringRow(for item: RecurringTransaction) -> UITableViewCell {
-        let label = self.makeValueLabel()
-        label.text = "\(ForecastFormatter.currency(item.amount)) · \(item.cadence.description)"
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.selectionStyle = .none
 
-        return FormRowCell(title: item.merchant, control: label, stretchesControl: true)
+        var content = UIListContentConfiguration.subtitleCell()
+        content.text = item.merchant
+        content.textProperties.numberOfLines = 1
+        content.textProperties.lineBreakMode = .byTruncatingTail
+        content.secondaryText = "\(ForecastFormatter.currency(item.amount)) · \(item.cadence.description)"
+        content.secondaryTextProperties.color = .secondaryLabel
+        cell.contentConfiguration = content
+
+        return cell
     }
 
     /// The footer is the only part that isn't a long-lived view, so it is the only
@@ -330,7 +341,8 @@ final class ForecastViewController: UITableViewController {
         return notes.joined(separator: " ")
     }
 
-    /// Enough to show the shape of the repeats without turning into a statement.
+    /// Per direction: enough to show the shape of the repeats without turning into
+    /// a statement.
     private static let shownRecurringLimit = 6
 
     private static func makeDetailRow(title: String, value: String) -> UITableViewCell {

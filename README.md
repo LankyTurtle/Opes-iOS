@@ -132,7 +132,7 @@ need to be entered again.
 
 Run `./Tests/Transactions/run.ps1` with PowerShell and Swift installed. These
 checks compile the production Foundation model, amount validation, CSV reader,
-parser, account persistence, and transaction store. A small account-preview stand-in removes the UIKit dependency;
+parser, account persistence, transaction store, and repeat detection. A small account-preview stand-in removes the UIKit dependency;
 Windows also stubs security-scoped URL access, which must be checked on iOS.
 Build in Xcode and verify the menu, both forms, Files picker cancellation,
 Upload/preview/import flow, Dynamic Type, and VoiceOver on a device or simulator.

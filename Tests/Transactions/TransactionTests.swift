@@ -108,6 +108,7 @@ enum TransactionTests {
         try self.occurrenceChecks()
         try self.accountDeletionChecks()
         try self.macquarieChecks()
+        try self.recurrenceChecks()
         let au = Locale(identifier: "en_AU")
         try self.expect(TransactionAmount.parse("12.34", locale: au) == Decimal(string: "12.34"), "Manual cents remain exact")
         try self.expect(TransactionAmount.parse(" 12.34 ", locale: au) != nil, "Manual whitespace")

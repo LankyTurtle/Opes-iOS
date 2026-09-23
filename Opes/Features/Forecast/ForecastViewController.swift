@@ -55,7 +55,7 @@ final class ForecastViewController: UITableViewController {
     private lazy var horizonControlView = FormControlView(control: self.horizonControl)
 
     private lazy var incomeRow = FormRowCell(
-        title: "Expected pay",
+        title: "Expected income",
         control: self.incomeLabel,
         stretchesControl: true
     )
@@ -308,11 +308,17 @@ final class ForecastViewController: UITableViewController {
 
         if self.forecast.spending.hasHistory {
             let days = self.forecast.spending.observedDays
-            let repeats = self.forecast.spending.recurring.count
+            let recurring = self.forecast.spending.recurring
+            let repeatsIn = recurring.filter(\.isIncome).count
+            let repeatsOut = recurring.count - repeatsIn
+            let repeats = [
+                repeatsIn > 0 ? "\(repeatsIn) repeating \(repeatsIn == 1 ? "deposit" : "deposits")" : nil,
+                repeatsOut > 0 ? "\(repeatsOut) repeating \(repeatsOut == 1 ? "payment" : "payments")" : nil,
+            ].compactMap { $0 }
 
-            if repeats > 0 {
+            if !repeats.isEmpty {
                 notes.append(
-                    "\(repeats) repeating \(repeats == 1 ? "payment is" : "payments are") projected onto the dates they next fall on."
+                    "\(repeats.joined(separator: " and ")) \(recurring.count == 1 ? "is" : "are") projected onto the dates they next fall on."
                 )
             }
 
@@ -326,9 +332,9 @@ final class ForecastViewController: UITableViewController {
         if self.forecast.expectedIncome == 0 {
             switch self.subject {
             case .netWorth:
-                notes.append("Add a pay cycle to include income.")
+                notes.append("No repeating money in was found. Add a pay cycle to include income.")
             case .account:
-                notes.append("No pay cycle is paid into this account, so no income is counted.")
+                notes.append("No pay cycle is paid into this account and no repeating money in was found, so no income is counted.")
             }
         }
 

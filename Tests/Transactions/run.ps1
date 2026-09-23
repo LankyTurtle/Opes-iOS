@@ -19,6 +19,10 @@ $sources = @(
     'Opes/Features/Transactions/TransactionCSVAttachment.swift',
     'Opes/Features/Transactions/TransactionCSVParser.swift',
     'Opes/Features/PayCycles/PayCycle.swift',
+    'Opes/Features/PayCycles/NextPayDateCalculator.swift',
+    'Opes/Features/PayCycles/AustralianPublicHolidayProvider.swift',
+    'Opes/Features/Forecast/BalanceHistory.swift',
+    'Opes/Features/Forecast/Forecast.swift',
     'Opes/Features/Forecast/SpendingPattern.swift'
 ) | ForEach-Object { Join-Path $repoRoot $_ }
 try {

@@ -27,6 +27,23 @@ extension TransactionTests {
                         "Money in and out under one name are found separately")
         try self.expect(!found.contains { $0.merchant == "Corner shop" }, "Charges of varying amounts are not a repeat")
 
+        // An account's forecast lands repeating money in on its dates, as it does
+        // repeating money out, unless a pay cycle already counts it.
+        let today = calendar.date(byAdding: .day, value: 43, to: start)!
+        let forecaster = BalanceForecaster(calendar: calendar)
+        let projected = forecaster.forecast(startingBalance: 1000, transactions: pay, payCycles: [], over: .threeMonths,
+                                            historyMonths: 1, from: today)
+        let fortnights = Decimal(projected.projectedPoints.dropFirst().filter {
+            calendar.dateComponents([.day], from: start, to: $0.date).day! % 14 == 0
+        }.count)
+        try self.expect(fortnights > 0 && projected.expectedIncome == 2300 * fortnights,
+                        "Repeating money in is projected at its usual amount on each date it falls")
+        try self.expect(projected.projectedBalance == 1000 + projected.expectedIncome, "Repeating money in raises the projected balance")
+        let cycle = PayCycle(name: "Acme pay", amount: 0, frequency: .weekly)
+        let covered = forecaster.forecast(startingBalance: 1000, transactions: pay, payCycles: [cycle], over: .threeMonths,
+                                          historyMonths: 1, from: today)
+        try self.expect(covered.expectedIncome == 0, "Money in a pay cycle already covers isn't counted twice")
+
         let pattern = SpendingPattern.make(from: rent + shop, asOf: calendar.date(byAdding: .day, value: 21, to: start)!, calendar: calendar)
         try self.expect(pattern.irregularDailyOutflow * Decimal(pattern.observedDays) == 77, "Repeats leave the irregular average; the rest stays in it")
     }
